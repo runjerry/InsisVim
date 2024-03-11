@@ -91,6 +91,14 @@ keymap("n", "<C-e>", "<C-u>", opt)
 -- hide highlight
 keymap("n", "cc", ":let @/ = ''<CR>", opt)
 
+-- -- comment
+-- keymap("v", "gcap", "gcip", { noremap = false })
+-- keymap("n", "gcap", "gcip", { noremap = false })
+
+-- better indenting in visual mode
+keymap("v", "<TAB>", ">gv", opt)
+keymap("v", "<S-TAB>", "<gv", opt)
+
 -- for debug
 keymap("i", "<F9>", "breakpoint()", opt)
 
