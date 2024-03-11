@@ -5,7 +5,7 @@ vim.o.scrolloff = 8
 vim.o.sidescrolloff = 8
 -- use relative number
 vim.wo.number = true
-vim.wo.relativenumber = true
+vim.wo.relativenumber = false
 -- highlight current row /column
 vim.wo.cursorline = true
 vim.wo.cursorcolumn = false
@@ -76,4 +76,5 @@ vim.opt.clipboard = "unnamedplus"
 -- disable netrw at the very start of your init.lua (strongly advised) nvim-tree
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
-vim.opt.virtualedit = "block"
+-- vim.opt.virtualedit = "block"
+vim.opt.virtualedit = "all"
