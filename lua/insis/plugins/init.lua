@@ -244,6 +244,9 @@ return {
     end,
   },
 
+  -- moonfly
+  { "bluz71/vim-moonfly-colors" },
+
   -- gruvbox
   { "rktjmp/lush.nvim" },
   { "ellisonleao/gruvbox.nvim" },
