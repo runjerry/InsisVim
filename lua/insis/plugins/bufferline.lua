@@ -14,9 +14,10 @@ if bufferline and cfg and cfg.enable then
           text_align = "left",
         },
       },
-      ---@diagnostic disable-next-line: assign-type-mismatch
-      diagnostics = "nvim_lsp",
-      ---@diagnostic disable-next-line: unused-local
+      -- @diagnostic disable-next-line: assign-type-mismatch
+      -- diagnostics = "nvim_lsp",
+      -- @diagnostic disable-next-line: unused-local
+      diagnostics = false,
       diagnostics_indicator = function(count, level, diagnostics_dict, context)
         local s = " "
         for e, n in pairs(diagnostics_dict) do
@@ -26,6 +27,17 @@ if bufferline and cfg and cfg.enable then
         return s
       end,
     },
+    highlights = {
+      buffer_selected = {
+        -- fg = "#ffbf00",
+        -- fg = "#cce6ff",
+        fg = "#e6f2ff",
+        bg = "#5a5a5a",
+        -- bg = "#595959",
+        bold = true,
+        italic = true,
+      },
+    }
   })
 
   keymap("n", cfg.keys.prev, ":BufferLineCyclePrev<CR>")
