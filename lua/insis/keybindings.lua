@@ -54,6 +54,11 @@ local opts_expr = {
   expr = true,
   silent = true,
 }
+local opt = {
+  noremap = true,
+  silent = true,
+}
+
 -- fix :set wrap
 keymap("n", "j", "v:count == 0 ? 'gj' : 'j'", opts_expr)
 keymap("n", "k", "v:count == 0 ? 'gk' : 'k'", opts_expr)
@@ -62,12 +67,32 @@ keymap("n", "k", "v:count == 0 ? 'gk' : 'k'", opts_expr)
 keymap("v", "<", "<gv")
 keymap("v", ">", ">gv")
 
+-- visual block move selection
+keymap("n", "<C-g>", "<C-q>", opt)
+
 -- 上下移动选中文本
 keymap("x", "J", ":move '>+1<CR>gv-gv")
 keymap("x", "K", ":move '<-2<CR>gv-gv")
 
 -- 在visual mode 里粘贴不要复制
 keymap("x", "p", '"_dP')
+
+-- copy and paste between nvim and everything else
+keymap("v", "<C-c>", '"+y', opt)
+keymap("n", "<C-c>", '"+y', opt)
+keymap("n", "<C-v>", '"+p', opt)
+
+-- beter navigation
+keymap("n", "<C-u>", "<C-d>", opt)
+keymap("n", "<C-d>", "<C-y>", opt)
+keymap("n", "<C-f>", "<C-e>", opt)
+keymap("n", "<C-e>", "<C-u>", opt)
+
+-- hide highlight
+keymap("n", "cc", ":let @/ = ''<CR>", opt)
+
+-- for debug
+keymap("i", "<F9>", "breakpoint()", opt)
 
 --------------- super window -----------------------
 
@@ -110,13 +135,14 @@ keymap("t", keys.terminal_to_normal, "<C-\\><C-n>")
 
 -- DEPRECATED :Terminal kes
 
--- map("n", "st", ":sp | terminal<CR>", opt)
--- map("n", "stv", ":vsp | terminal<CR>", opt)
--- map("t", "<A-h>", [[ <C-\><C-N><C-w>h ]], opt)
--- map("t", "<A-j>", [[ <C-\><C-N><C-w>j ]], opt)
--- map("t", "<A-k>", [[ <C-\><C-N><C-w>k ]], opt)
--- map("t", "<A-l>", [[ <C-\><C-N><C-w>l ]], opt)
--- map("t", "<leader>h", [[ <C-\><C-N><C-w>h ]], opt)
--- map("t", "<leader>j", [[ <C-\><C-N><C-w>j ]], opt)
--- map("t", "<leader>k", [[ <C-\><C-N><C-w>k ]], opt)
--- map("t", "<leader>l", [[ <C-\><C-N><C-w>l ]], opt)
+keymap("n", "t", ":terminal<CR>", opt)
+keymap("n", "t-", ":sp | terminal<CR>", opt)
+keymap("n", "t\\", ":vsp | terminal<CR>", opt)
+keymap("t", "<C-h>", [[ <C-\><C-N><C-w>h ]], opt)
+keymap("t", "<C-j>", [[ <C-\><C-N><C-w>j ]], opt)
+keymap("t", "<C-k>", [[ <C-\><C-N><C-w>k ]], opt)
+keymap("t", "<C-l>", [[ <C-\><C-N><C-w>l ]], opt)
+keymap("t", "<leader>h", [[ <C-\><C-N><C-w>h ]], opt)
+keymap("t", "<leader>j", [[ <C-\><C-N><C-w>j ]], opt)
+keymap("t", "<leader>k", [[ <C-\><C-N><C-w>k ]], opt)
+keymap("t", "<leader>l", [[ <C-\><C-N><C-w>l ]], opt)

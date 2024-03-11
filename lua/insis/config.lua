@@ -1,5 +1,5 @@
 ---@class UserConfig
----@field colorscheme? "tokyonight" | "nord" | "onedark" | "gruvbox" | "nightfox" | "nordfox" | "duskfox" | "dracula" builtin colorscheme
+---@field colorscheme? "tokyonight" | "nord" | "moonfly" | "onedark" | "gruvbox" | "nightfox" | "nordfox" | "duskfox" | "dracula" builtin colorscheme
 ---@field max_highlight_line_count? number disable code hightlight on big file for performance default 10000
 ---@field enable_imselect? boolean auto switch your input method, default false  ---@see https://github.com/daipeihust/im-select
 ---@field enable_very_magic_search? boolean enable regexp very magic mode ---@see https://www.youtube.com/watch?v=VjOcINs6QWs
@@ -48,15 +48,17 @@ local UserConfig = {
 
   ---@class Commonkeys
   keys = {
-    leader_key = " ",
+    leader_key = ";",
     -- quick save / quite
-    n_save = "<leader>w", -- :w
-    n_force_quit = "<leader>q", -- :qa!
+    -- n_save = "<leader>w", -- :w
+    n_save = "<C-s>", -- :w
+    -- n_force_quit = "<leader>q", -- :qa!
+    n_force_quit = "<C-w>", -- :qa!
     -- quick move
-    n_v_5j = "<C-j>",
-    n_v_5k = "<C-k>",
-    n_v_10k = "<C-u>",
-    n_v_10j = "<C-d>",
+    -- n_v_5j = "<C-j>",
+    -- n_v_5k = "<C-k>",
+    n_v_10k = "<space>k",
+    n_v_10j = "<space>j",
     fold = {
       open = "zo",
       close = "zc",
@@ -73,10 +75,12 @@ local UserConfig = {
     enable = true,
     keys = {
       -- left / right cycle
-      prev = "<C-h>",
-      next = "<C-l>",
+      -- prev = "<C-h>",
+      -- next = "<C-l>",
+      prev = "<C-b>",
+      next = "<TAB>",
       -- close current buffer
-      close = "<C-w>",
+      close = "<leader>w",
       -- close = "<leader>bc",
       -- close all left / right tabs
       close_left = "<leader>bh",
@@ -91,17 +95,17 @@ local UserConfig = {
   s_windows = {
     enable = true,
     keys = {
-      split_vertically = "sv",
-      split_horizontally = "sh",
+      split_vertically = "s\\",
+      split_horizontally = "s-",
       -- close current
-      close = "sc",
+      close = "sw",
       -- close others
       close_others = "so",
       -- jump between windows
-      jump_left = { "<A-h>", "<leader>h" },
-      jump_right = { "<A-l>", "<leader>l" },
-      jump_up = { "<A-k>", "<leader>k" },
-      jump_down = { "<A-j>", "<leader>j" },
+      jump_left = { "<C-h>", "<leader>h" },
+      jump_right = { "<C-l>", "<leader>l" },
+      jump_up = { "<C-k>", "<leader>k" },
+      jump_down = { "<C-j>", "<leader>j" },
       -- control windows size
       width_decrease = "s,",
       width_increase = "s.",
@@ -162,14 +166,14 @@ local UserConfig = {
   nvimTree = {
     enable = true,
     keys = {
-      toggle = { "<A-m>", "<leader>m" },
+      toggle = { "<A-m>", "<leader>t" },
       refresh = "R",
       -- open / close --
       edit = { "o", "<2-LeftMouse>" },
       close = "<BS>", -- close parent folder
       system_open = "<CR>",
-      vsplit = "sv",
-      split = "sh",
+      vsplit = "v",
+      split = "h",
       tabnew = "st",
       -- movement --
       parent_node = "P",
@@ -199,8 +203,11 @@ local UserConfig = {
   telescope = {
     enable = true,
     keys = {
-      find_files = { "<C-p>", "ff" },
-      live_grep = "<C-f>",
+      -- find_files = { "<C-p>", "ff" },
+      -- live_grep = "<C-f>",
+      find_files = { "<leader>f", "ff" },
+      git_files = "<leader>F",
+      live_grep = "<leader>g",
       -- super find  "xx" -tmd ---@see telescope-live-grep-args.nvim
       live_grep_args = "sf",
       -- up and down
@@ -211,7 +218,7 @@ local UserConfig = {
       cycle_history_prev = "<Up>",
       -- close window
       close = "<esc>",
-      -- scrolling in preview window
+      -- -- scrolling in preview window
       preview_scrolling_up = "<C-u>",
       preview_scrolling_down = "<C-d>",
     },
@@ -311,7 +318,7 @@ local UserConfig = {
     -- Popup code action
     code_action = "<leader>ca",
     -- Format the current buffer
-    format = "<leader>f",
+    format = "<leader>m",
 
     ----- Diagnostic ------
 

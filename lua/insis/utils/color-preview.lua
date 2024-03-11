@@ -11,6 +11,7 @@ local actions = require("telescope.actions")
 local action_state = require("telescope.actions.state")
 local mycolors = {
   "nord",
+  "moonfly",
   "onedark",
   "gruvbox",
   "tokyonight",
