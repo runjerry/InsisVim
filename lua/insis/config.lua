@@ -59,10 +59,6 @@ local UserConfig = {
     -- n_v_5k = "<C-k>",
     n_v_10k = "<space>k",
     n_v_10j = "<space>j",
-    fold = {
-      open = "zo",
-      close = "zc",
-    },
     terminal_to_normal = "<Esc>",
   },
 
