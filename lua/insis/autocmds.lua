@@ -90,15 +90,15 @@ autocmd({ "FileType" }, {
   end,
 })
 
--- save fold
-autocmd("BufWinEnter", {
-  group = myAutoGroup,
-  pattern = "*",
-  command = "silent! loadview",
-})
-
-autocmd("BufWrite", {
-  group = myAutoGroup,
-  pattern = "*",
-  command = "mkview",
-})
+-- -- save fold
+-- autocmd("BufWinEnter", {
+--   group = myAutoGroup,
+--   pattern = "*",
+--   command = "silent! loadview",
+-- })
+--
+-- autocmd("BufWrite", {
+--   group = myAutoGroup,
+--   pattern = "*",
+--   command = "mkview",
+-- })
