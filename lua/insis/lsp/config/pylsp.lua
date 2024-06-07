@@ -13,6 +13,7 @@ local opts = {
           ignore = { "E266", "E402", "E501", "E741", "W291", "W391", "W501", "W503", "W504" },
           maxLineLength = 100,
         },
+        pyflakes = { enabled = false },
       },
     },
   },
