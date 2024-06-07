@@ -26,6 +26,9 @@ keymap("n", keys.n_force_quit, "<CMD>qa!<CR>")
 -- keymap("n", keys.n_save_all, "<CMD>wa<CR>")
 -- keymap("n", keys.n_save_all_quit, "<CMD>wqa<CR>")
 
+-- reload buffer
+keymap("n", keys.n_reload, "<CMD>e!<CR>")
+
 -- $ jump to the end without space (swap $ and g_)
 keymap({ "v", "n" }, "$", "g_")
 keymap({ "v", "n" }, "g_", "$")
