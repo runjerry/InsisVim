@@ -2,7 +2,8 @@ require("insis").setup({
   colorscheme = "moonfly",
   cmp = {
     -- 启用 copilot
-    copilot = true,
+    -- copilot = true,
+    codeium = true,
   },
   python = {
     enable = true,
