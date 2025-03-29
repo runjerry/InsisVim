@@ -54,8 +54,8 @@ local UserConfig = {
     n_save = "<C-s>", -- :w
     -- n_force_quit = "<leader>q", -- :qa!
     n_force_quit = "<C-w>", -- :qa!
-    n_reload = "<C-r>", -- :e!
-    -- n_reload = "<leader>r", -- :e!
+    -- n_reload = "<C-r>", -- :e!
+    n_reload = "<leader>r", -- :e!
     -- quick move
     -- n_v_5j = "<C-j>",
     -- n_v_5k = "<C-k>",
