@@ -84,8 +84,8 @@ vim.o.showmode = false
 --  },
 --  cache_enabled = 0,
 -- }
-vim.opt.clipboard = "unnamed"
--- vim.opt.clipboard = "unnamedplus"
+-- vim.opt.clipboard = "unnamed"
+vim.opt.clipboard = "unnamedplus"
 -- disable netrw at the very start of your init.lua (strongly advised) nvim-tree
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
