@@ -132,7 +132,7 @@ local UserConfig = {
     -- enable copilot cmp
     copilot = false,
     -- run ':Copilot auth' for the first time
-    codeium = false,
+    codeium = true,
     -- run `:Codeium Auth ` for the first time
     keys = {
       confirm = "<CR>",
