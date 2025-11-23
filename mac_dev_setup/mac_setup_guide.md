@@ -1,14 +1,6 @@
-# Mac Mini Setup Guide - Alacritty + Fish + tmux + Neovim
+# Mac Dev Setup Guide - Alacritty + Fish + tmux + Neovim
 
-Complete guide to replicate your macOS development environment.
-
----
-
-## Prerequisites
-
-1. **Mac Mini running macOS**
-2. **GitHub account access** (for cloning your nvim config)
-3. **Internet connection**
+Complete guide to for setting up macOS development environment.
 
 ---
 
@@ -39,7 +31,7 @@ brew --version
 brew install --cask alacritty
 
 # Shell and utilities
-brew install fish fzf ripgrep tmux neovim
+brew install fish fzf ripgrep tmux
 
 # Git (if not already installed)
 brew install git
@@ -62,6 +54,7 @@ brew install --cask karabiner-elements
 After installation:
 1. Open **Karabiner-Elements** from Applications
 2. Grant necessary permissions in **System Settings → Privacy & Security**
+3. In **Complex Modifications → Add your own rule**: copy rules from existing macos
 
 ---
 
@@ -154,7 +147,20 @@ git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 ## Step 9: Setup Neovim
 
 ```bash
-# Switch to macos branch (if not already)
+# Install neovim v0.9.5
+wget https://github.com/neovim/neovim/releases/download/v0.9.5/nvim-macos.tar.gz
+tar xzf nvim-macos.tar.gz
+# If /usr/local/bin does not exist: sudo mkdir -p /usr/local/bin
+sudo mv nvim-macos /usr/local/nvim-0.9.5/
+sudo ln -sf /usr/local/nvim-0.9.5/bin/nvim /usr/local/bin/nvim
+
+# clean up existing nvim configs (if needed) and 
+rm -rf ~/.local/share/nvim
+rm -rf ~/.cache/nvim
+rm -rf ~/.config/nvim
+
+# Clone this github repo and switch to macos branch
+git clone git@github.com:runjerry/InsisVim.git ~/.config/nvim
 cd ~/.config/nvim
 git checkout macos
 
