@@ -1,4 +1,4 @@
-# Mac Mini Setup Guide - Alacritty + Fish + fzf + ripgrep + tmux + Neovim
+# Mac Mini Setup Guide - Alacritty + Fish + tmux + Neovim
 
 Complete guide to replicate your macOS development environment.
 
@@ -186,15 +186,13 @@ nvim
 ```
 
 ---
----
 
 > **⚠️ ESSENTIAL vs OPTIONAL STEPS**
 >
 > **Steps 1-10 above are ESSENTIAL** for the correct development environment setup.
 >
-> **The following steps (11-16) are OPTIONAL** - maynot need if Step 7 is well-done.
+> **The following steps (11-16) are OPTIONAL** - maynot be needed if Step 7 is well-done.
 
----
 ---
 
 ## Step 11: Configure Alacritty Themes (if needed)
