@@ -1,4 +1,4 @@
-# Mac Dev Setup Guide - Alacritty + Fish + tmux + Neovim
+# Mac Dev Setup Guide - Alacritty + Fish + Tmux + Neovim
 
 Complete guide to for setting up macOS development environment.
 
@@ -133,10 +133,10 @@ scp YOUR_USERNAME@MACBOOK_IP:~/.tmux.conf ~/
 
 ---
 
-## Step 8: Install tmux plugins
+## Step 8: Install Tmux Plugins
 
 ```bash
-# install tmux plugin manager (TMP)
+# Install tmux plugin manager (TMP)
 git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
 
 # after starting tmux: prefix (ctrl+a) + I to install Tmux plugins
