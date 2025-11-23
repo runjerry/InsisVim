@@ -44,11 +44,11 @@ brew install fish fzf ripgrep tmux neovim
 # Git (if not already installed)
 brew install git
 
+# Modern bash (required for tmux tokyo-night theme)
+brew install bash
+
 # Node.js (required for some Neovim plugins)
 brew install node
-
-# Additional useful tools
-brew install bat eza fd
 ```
 
 ---
@@ -73,6 +73,11 @@ echo /opt/homebrew/bin/fish | sudo tee -a /etc/shells
 
 # Set fish as default shell
 chsh -s /opt/homebrew/bin/fish
+
+# Check fish is in PATH
+echo $PATH
+# If not, add it
+fish_add_path "/opt/homebrew/bin/"
 ```
 
 Log out and log back in, or open a new terminal to activate Fish.
@@ -97,31 +102,18 @@ fisher install PatrickF1/fzf.fish
 # z (directory jumper)
 fisher install jethrokuan/z
 
-# nvm (Node version manager) - if needed
+# A plugin that avoids issues where fish doesn't recognize global npm scripts
+fisher install rstacruz/fish-npm-global
+
+# nvm (Node version manager)
 fisher install jorgebucaran/nvm.fish
 ```
 
 ---
 
-## Step 7: Clone Configuration Files from Your MacBook
+## Step 7: Clone Configuration Files from A Ready Mac, say MacBook
 
-### Option A: Using Git (Recommended)
-
-If your configs are in a GitHub repo:
-
-```bash
-# Neovim config
-git clone https://github.com/YOUR_USERNAME/YOUR_NVIM_REPO.git ~/.config/nvim
-cd ~/.config/nvim
-git checkout newton_stable
-
-# Fish config (if you have a separate repo)
-# Or manually copy the files as shown in Option B
-```
-
-### Option B: Manual Copy via SSH/rsync
-
-From your **Mac Mini**, run:
+From current **Mac**, run:
 
 ```bash
 # Create config directories
@@ -142,30 +134,32 @@ scp -r YOUR_USERNAME@MACBOOK_IP:~/.config/nvim ~/.config/
 # Karabiner config
 scp -r YOUR_USERNAME@MACBOOK_IP:~/.config/karabiner ~/.config/
 
-# Tmux config (if you have one)
+# Tmux config
 scp YOUR_USERNAME@MACBOOK_IP:~/.tmux.conf ~/
 ```
 
-### Option C: Using iCloud/Dropbox/USB Drive
+---
 
-Copy these directories:
-- `~/.config/alacritty/`
-- `~/.config/fish/`
-- `~/.config/nvim/`
-- `~/.config/karabiner/`
-- `~/.tmux.conf` (if exists)
+## Step 8: Install tmux plugins
+
+```bash
+# install tmux plugin manager (TMP)
+git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
+
+# after starting tmux: prefix (ctrl+a) + I to install Tmux plugins
+```
 
 ---
 
-## Step 8: Setup Neovim
+## Step 9: Setup Neovim
 
 ```bash
-# Switch to newton_stable branch (if not already)
+# Switch to macos branch (if not already)
 cd ~/.config/nvim
-git checkout newton_stable
+git checkout macos
 
 # First launch (plugins will auto-install)
-nvim
+nvim .
 
 # Wait for all plugins to install
 # If you get the rainbow-delimiters error:
@@ -175,7 +169,35 @@ rm -rf ~/.local/share/nvim/lazy/rainbow-delimiters.nvim
 
 ---
 
-## Step 9: Configure Alacritty Themes (if needed)
+## Step 10: Setup Codeium
+
+```bash
+# Launch nvim
+nvim
+
+# In nvim, run:
+:Codeium Auth
+
+# Follow the authentication flow:
+# 1. Open the URL in browser
+# 2. Login with your email
+# 3. Copy the token
+# 4. Paste into nvim
+```
+
+---
+
+# ═══════════════════════════════════════════════════════════════════════════════
+
+**Steps 1-10 above are ESSENTIAL for the correct development environment setup.**
+
+**The following steps (11-16) are OPTIONAL - maynot need if Step 7 is well-done.**
+
+# ═══════════════════════════════════════════════════════════════════════════════
+
+---
+
+## Step 11: Configure Alacritty Themes (if needed)
 
 ```bash
 cd ~/.config/alacritty
@@ -185,9 +207,9 @@ git clone https://github.com/alacritty/alacritty-theme themes
 
 ---
 
-## Step 10: Setup fzf Key Bindings
+## Step 12: Verify fzf Key Bindings
 
-Edit `~/.config/fish/config.fish` and ensure it has:
+Open `~/.config/fish/config.fish` and ensure it has:
 
 ```fish
 if status is-interactive
@@ -206,7 +228,7 @@ source ~/.config/fish/config.fish
 
 ---
 
-## Step 11: Verify Karabiner Rules
+## Step 13: Verify Karabiner Rules
 
 1. Open **Karabiner-Elements**
 2. Go to **Complex Modifications** tab
@@ -215,25 +237,8 @@ source ~/.config/fish/config.fish
 
 ---
 
-## Step 12: Setup Codeium (Optional)
 
-```bash
-# Launch nvim
-nvim
-
-# In nvim, run:
-:Codeium Auth
-
-# Follow the authentication flow:
-# 1. Open the URL in browser
-# 2. Login with your email
-# 3. Copy the token
-# 4. Paste into nvim
-```
-
----
-
-## Step 13: Install Additional LSPs/Formatters (Optional)
+## Step 14: Install Additional LSPs/Formatters (Optional)
 
 Based on your development needs:
 
@@ -260,7 +265,7 @@ brew install shfmt shellcheck
 
 ---
 
-## Step 14: Verify Everything Works
+## Step 15: Verify Everything Works
 
 ### Test Alacritty
 ```bash
@@ -299,7 +304,7 @@ In Alacritty/Terminal, press:
 
 ---
 
-## Step 15: Final Touches
+## Step 16: Final Touches
 
 ### Set Alacritty as Default Terminal (Optional)
 
@@ -359,6 +364,20 @@ $(brew --prefix)/opt/fzf/install
 # Select "yes" for key bindings
 ```
 
+### Tmux status line missing powerline separators/icons
+```bash
+# The tmux-tokyo-night theme requires modern bash (5.x)
+# macOS default bash is 3.2 which is too old
+brew install bash
+
+# Verify installation
+/opt/homebrew/bin/bash --version
+
+# Restart tmux
+tmux kill-server
+tmux
+```
+
 ---
 
 ## Quick Checklist
@@ -367,6 +386,7 @@ $(brew --prefix)/opt/fzf/install
 - [ ] Alacritty installed
 - [ ] Fish installed and set as default shell
 - [ ] fzf, ripgrep, tmux installed
+- [ ] Modern bash installed (5.x for tmux themes)
 - [ ] Neovim installed
 - [ ] Karabiner-Elements installed
 - [ ] All config files copied
