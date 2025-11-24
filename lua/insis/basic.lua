@@ -72,20 +72,8 @@ vim.o.showtabline = 2
 -- use lualine plugin instead
 vim.o.showmode = false
 -- system clipboard
--- vim.g.clipboard = {
---  name = "xsel",
---  copy = {
---   ["+"] = "xsel --nodetach -i -b",
---   ["*"] = "xsel --nodetach -i -p",
---  },
---  paste = {
---   ["+"] = "xsel  -o -b",
---   ["*"] = "xsel  -o -b",
---  },
---  cache_enabled = 0,
--- }
--- vim.opt.clipboard = "unnamed"
 vim.opt.clipboard = "unnamedplus"
+
 -- disable netrw at the very start of your init.lua (strongly advised) nvim-tree
 vim.g.loaded_netrw = 1
 vim.g.loaded_netrwPlugin = 1
