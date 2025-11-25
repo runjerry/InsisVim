@@ -34,13 +34,13 @@ The setup script will configure the remote machine automatically.
 SSH to your remote Linux machine, then download the setup script:
 
 ```bash
-# Option 1: Clone your nvim config repository (if it contains this script)
-git clone <your-nvim-config-repo> ~/.config/nvim
-
-# Option 2: Download the script directly
+# Option 1: Download the script directly
 curl -O https://raw.githubusercontent.com/runjerry/InsisVim/remote-setup/mac_dev_setup/setup_remote_linux.sh
 # or use wget
 wget https://raw.githubusercontent.com/runjerry/InsisVim/remote-setup/mac_dev_setup/setup_remote_linux.sh
+
+# Option 2: Clone your nvim config repository (if it contains this script)
+git clone <your-nvim-config-repo> ~/.config/nvim
 ```
 
 ### 2. Run the Setup Script
@@ -57,18 +57,14 @@ The script will:
 - Optionally install Fish shell and Neovim
 - Guide you through next steps
 
-### 3. Sync Your Neovim Configuration
+### 3. Install Tmux and Neovim Plugins
 
-If you haven't already, clone your Neovim config to the remote machine:
-
-```bash
-git clone <your-nvim-config-repo> ~/.config/nvim
-```
-
-Make sure your `~/.config/nvim/lua/insis/basic.lua` contains:
-```lua
-vim.opt.clipboard = "unnamedplus"
-```
+- After starting tmux, press `ctrl+a` then `I` (shift+i) to intall all plugins.
+- First launch of nvim will automatically install all plugins.
+- Install claude-code
+  ```bash
+  curl -fsSL https://claude.ai/install.sh | bash
+  ```
 
 ### 4. Test the Setup
 
