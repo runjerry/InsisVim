@@ -167,6 +167,15 @@ install_core_tools() {
     else
         print_success "ripgrep already installed"
     fi
+    
+    # unzip (required by Mason to install tools like stylua)
+    if ! command_exists unzip; then
+        print_info "Installing unzip (required by Mason)..."
+        $INSTALL_CMD unzip
+        print_success "unzip installed"
+    else
+        print_success "unzip already installed"
+    fi
 
     # tmux (need 3.3+ for OSC 52 allow-passthrough)
     TMUX_MIN_VERSION="3.3"
@@ -358,106 +367,26 @@ setup_tmux() {
         cp ~/.tmux.conf ~/.tmux.conf.backup.$(date +%Y%m%d_%H%M%S)
     fi
 
-    # Create tmux configuration
-    cat > ~/.tmux.conf << 'TMUX_EOF'
-# Tmux configuration for remote development with OSC 52 clipboard support
+    # Download tmux configuration from GitHub
+    local SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-set -g default-terminal "tmux-256color"
-# Enable true-color support
-set -ag terminal-overrides ",xterm-256color:RGB"
+    # Extract repo path from SSH format (git@github.com:user/repo.git -> user/repo)
+    local REPO_PATH="${NVIM_CONFIG_REPO#git@github.com:}"
+    REPO_PATH="${REPO_PATH%.git}"
 
-# Allow passthrough for OSC 52 (tmux 3.3+)
-set -g allow-passthrough on
-
-# Use external clipboard (enables OSC 52 passthrough)
-set -g set-clipboard external
-
-# remap prefix from 'C-b' to 'C-a'
-set -g prefix C-a
-unbind C-b
-bind-key C-a send-prefix
-
-# Split panes using \ and -
-unbind %
-bind '\' split-window -h
-unbind '"'
-bind - split-window -v
-
-# Reload configuration
-unbind r
-bind r source-file ~/.tmux.conf \; display-message "Config reloaded!"
-
-# Moving between panes
-bind h select-pane -L
-bind j select-pane -D
-bind k select-pane -U
-bind l select-pane -R
-
-# Re-bind last window command
-bind b last-window
-
-# Pane resizing
-bind -r H resize-pane -L 5
-bind -r J resize-pane -D 5
-bind -r K resize-pane -U 5
-bind -r L resize-pane -R 5
-
-# Enable mouse support
-set -g mouse on
-
-# Set vi mode for copy mode
-set-window-option -g mode-keys vi
-
-# Copy mode bindings
-bind Escape copy-mode
-unbind p
-bind p paste-buffer
-bind-key -T copy-mode-vi 'v' send -X begin-selection
-bind-key -T copy-mode-vi 'y' send -X copy-selection
-unbind -T copy-mode-vi MouseDragEnd1Pane
-
-# Remove delay for exiting insert mode with ESC in Neovim
-set -sg escape-time 10
-
-# Rather than constraining window size to the maximum size of any client
-# connected to the *session*, constrain window size to the maximum size of any
-# client connected to *that window*
-setw -g aggressive-resize on
-
-# Status bar configuration
-set -g status-position bottom
-set -g status-justify left
-set -g status-style 'bg=colour234 fg=colour137'
-set -g status-left ''
-set -g status-right '#[fg=colour233,bg=colour241,bold] %d/%m #[fg=colour233,bg=colour245,bold] %H:%M:%S '
-set -g status-right-length 50
-set -g status-left-length 20
-
-# Window status
-setw -g window-status-current-style 'fg=colour1 bg=colour19 bold'
-setw -g window-status-current-format ' #I#[fg=colour249]:#[fg=colour255]#W#[fg=colour249]#F '
-setw -g window-status-style 'fg=colour9 bg=colour18'
-setw -g window-status-format ' #I#[fg=colour237]:#[fg=colour250]#W#[fg=colour244]#F '
-
-# Pane borders
-set -g pane-border-style 'fg=colour238'
-set -g pane-active-border-style 'fg=colour51'
-
-# Messages
-set -g message-style 'fg=colour232 bg=colour166 bold'
-
-# tmux plugin manager
-set -g @plugin 'tmux-plugins/tpm'
-set -g @plugin 'christoomey/vim-tmux-navigator'
-set -g @plugin 'tmux-plugins/tmux-continuum'
-
-set -g @continuum-restore 'on'
-
-# Initialize TMUX plugin manager (keep this line at the very bottom of tmux.conf)
-run '~/.tmux/plugins/tpm/tpm'
-TMUX_EOF
-
-    print_success "tmux configuration created at ~/.tmux.conf"
+    # Check if we're running from the cloned repo
+    if [ -f "$SCRIPT_DIR/tmux.conf" ]; then
+        print_info "Copying tmux config from local directory..."
+        cp "$SCRIPT_DIR/tmux.conf" ~/.tmux.conf
+    else
+        # Download from GitHub if not running from repo
+        print_info "Downloading tmux config from GitHub..."
+        curl -fsSL "https://raw.githubusercontent.com/${REPO_PATH}/${NVIM_CONFIG_BRANCH}/mac_dev_setup/tmux.conf" -o ~/.tmux.conf || {
+            print_error "Failed to download tmux config"
+            return 1
+        }
+    fi
+    print_success "tmux configuration installed at ~/.tmux.conf"
 
     # Install TPM (Tmux Plugin Manager)
     if [ ! -d ~/.tmux/plugins/tpm ]; then
