@@ -19,7 +19,7 @@ echo ""
 #######################################
 
 NVIM_CONFIG_REPO="git@github.com:runjerry/InsisVim.git"
-NVIM_CONFIG_BRANCH="macos"  # Change this if you want a different branch
+NVIM_CONFIG_BRANCH="remote-setup"
 NEOVIM_VERSION="v0.9.5"
 
 # Colors for output
