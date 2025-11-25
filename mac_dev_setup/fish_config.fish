@@ -43,3 +43,33 @@ end
 # Alias vim to nvim
 alias vim="nvim"
 alias vi="nvim"
+
+# SSH Agent setup for Fish + Tmux
+set -gx SSH_ENV $HOME/.ssh/environment
+
+function start_agent
+    echo "Starting SSH agent..."
+    ssh-agent -c | sed 's/^echo/#echo/' > $SSH_ENV
+    chmod 600 $SSH_ENV
+    source $SSH_ENV > /dev/null
+    ssh-add ~/.ssh/id_ed25519 2>/dev/null
+end
+
+function test_identities
+    ssh-add -l > /dev/null 2>&1
+    return $status
+end
+
+# Check if agent is running
+if test -n "$SSH_AGENT_PID"
+    if not ps -p $SSH_AGENT_PID > /dev/null
+        start_agent
+    end
+else if test -f $SSH_ENV
+    source $SSH_ENV > /dev/null
+    if not test_identities
+        start_agent
+    end
+else
+    start_agent
+end

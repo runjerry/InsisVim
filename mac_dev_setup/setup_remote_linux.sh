@@ -168,14 +168,61 @@ install_core_tools() {
         print_success "ripgrep already installed"
     fi
 
-    # tmux
-    if ! command_exists tmux; then
-        print_info "Installing tmux..."
-        $INSTALL_CMD tmux
-        print_success "tmux installed"
+    # tmux (need 3.3+ for OSC 52 allow-passthrough)
+    TMUX_MIN_VERSION="3.3"
+    install_tmux_from_source() {
+        print_info "Building tmux 3.4 from source..."
+        $INSTALL_CMD libevent-dev ncurses-dev build-essential bison pkg-config autoconf automake
+        cd /tmp
+        wget -q https://github.com/tmux/tmux/releases/download/3.4/tmux-3.4.tar.gz
+        tar xzf tmux-3.4.tar.gz
+        cd tmux-3.4
+        ./configure && make
+        sudo make install
+        cd /tmp && rm -rf tmux-3.4 tmux-3.4.tar.gz
+        print_success "tmux 3.4 installed from source"
+    }
+
+    if command_exists tmux; then
+        TMUX_VERSION=$(tmux -V | sed 's/tmux //')
+        # Extract major.minor version for comparison
+        TMUX_MAJOR=$(echo "$TMUX_VERSION" | cut -d. -f1)
+        TMUX_MINOR=$(echo "$TMUX_VERSION" | cut -d. -f2 | cut -d- -f1 | tr -dc '0-9')
+
+        if [ "$TMUX_MAJOR" -lt 3 ] || ([ "$TMUX_MAJOR" -eq 3 ] && [ "$TMUX_MINOR" -lt 3 ]); then
+            print_warning "tmux $TMUX_VERSION is installed, but 3.3+ is required for OSC 52 clipboard"
+            if ask_yes_no "Build tmux 3.4 from source?"; then
+                install_tmux_from_source
+            else
+                print_warning "Keeping tmux $TMUX_VERSION - clipboard integration may not work"
+            fi
+        else
+            print_success "tmux already installed: tmux $TMUX_VERSION (>= 3.3, OK)"
+        fi
     else
-        TMUX_VERSION=$(tmux -V)
-        print_success "tmux already installed: $TMUX_VERSION"
+        print_info "Installing tmux..."
+        # Try package manager first
+        $INSTALL_CMD tmux || true
+
+        if command_exists tmux; then
+            TMUX_VERSION=$(tmux -V | sed 's/tmux //')
+            TMUX_MAJOR=$(echo "$TMUX_VERSION" | cut -d. -f1)
+            TMUX_MINOR=$(echo "$TMUX_VERSION" | cut -d. -f2 | cut -d- -f1 | tr -dc '0-9')
+
+            if [ "$TMUX_MAJOR" -lt 3 ] || ([ "$TMUX_MAJOR" -eq 3 ] && [ "$TMUX_MINOR" -lt 3 ]); then
+                print_warning "Package manager installed tmux $TMUX_VERSION, but 3.3+ is required"
+                if ask_yes_no "Build tmux 3.4 from source instead?"; then
+                    install_tmux_from_source
+                fi
+            else
+                print_success "tmux installed: tmux $TMUX_VERSION"
+            fi
+        else
+            print_warning "Package manager failed to install tmux"
+            if ask_yes_no "Build tmux 3.4 from source?"; then
+                install_tmux_from_source
+            fi
+        fi
     fi
 
     # Node.js (required for some Neovim plugins)
@@ -365,9 +412,6 @@ set -sg escape-time 10
 # connected to the *session*, constrain window size to the maximum size of any
 # client connected to *that window*
 setw -g aggressive-resize on
-
-# always display tabline
-set -g showtabline 2
 
 # Status bar configuration
 set -g status-position bottom
