@@ -19,7 +19,7 @@ echo ""
 #######################################
 
 NVIM_CONFIG_REPO="git@github.com:runjerry/InsisVim.git"
-NVIM_CONFIG_BRANCH="remote-setup"
+NVIM_CONFIG_BRANCH="remote-setup"  # Change this if you want a different branch
 NEOVIM_VERSION="v0.9.5"
 
 # Colors for output
@@ -301,28 +301,39 @@ setup_fish_config_and_plugins() {
     # Download fish config files from GitHub
     local SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
+    # Extract repo path from SSH format (git@github.com:user/repo.git -> user/repo)
+    local REPO_PATH="${NVIM_CONFIG_REPO#git@github.com:}"
+    REPO_PATH="${REPO_PATH%.git}"
+
     # Check if we're running from the cloned repo
-    if [ -f "$SCRIPT_DIR/fish_config.fish" ] && [ -f "$SCRIPT_DIR/fish_plugins" ]; then
-        print_info "Copying fish config files from local directory..."
+    if [ -f "$SCRIPT_DIR/fish_config.fish" ]; then
+        print_info "Copying fish config from local directory..."
         cp "$SCRIPT_DIR/fish_config.fish" ~/.config/fish/config.fish
-        cp "$SCRIPT_DIR/fish_plugins" ~/.config/fish/fish_plugins
     else
         # Download from GitHub if not running from repo
-        print_info "Downloading fish config files from GitHub..."
-        curl -fsSL "https://raw.githubusercontent.com/${NVIM_CONFIG_REPO#*github.com/}/remote-setup/mac_dev_setup/fish_config.fish" -o ~/.config/fish/config.fish || {
+        print_info "Downloading fish config from GitHub..."
+        curl -fsSL "https://raw.githubusercontent.com/${REPO_PATH}/${NVIM_CONFIG_BRANCH}/mac_dev_setup/fish_config.fish" -o ~/.config/fish/config.fish || {
             print_warning "Failed to download fish config, creating basic config"
             touch ~/.config/fish/config.fish
         }
-        curl -fsSL "https://raw.githubusercontent.com/${NVIM_CONFIG_REPO#*github.com/}/remote-setup/mac_dev_setup/fish_plugins" -o ~/.config/fish/fish_plugins || {
-            print_warning "Failed to download fish_plugins"
-        }
     fi
-    print_success "Fish config files in place"
+    print_success "Fish config.fish in place"
 
-    # Install Fisher (bootstrap)
+    # Install Fisher (bootstrap) - this overwrites fish_plugins, so we download plugins list AFTER
     print_info "Installing Fisher (Fish plugin manager)..."
     fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher" || true
     print_success "Fisher installed"
+
+    # Now download fish_plugins AFTER Fisher is installed (Fisher overwrites this file)
+    if [ -f "$SCRIPT_DIR/fish_plugins" ]; then
+        print_info "Copying fish_plugins from local directory..."
+        cp "$SCRIPT_DIR/fish_plugins" ~/.config/fish/fish_plugins
+    else
+        print_info "Downloading fish_plugins from GitHub..."
+        curl -fsSL "https://raw.githubusercontent.com/${REPO_PATH}/${NVIM_CONFIG_BRANCH}/mac_dev_setup/fish_plugins" -o ~/.config/fish/fish_plugins || {
+            print_warning "Failed to download fish_plugins"
+        }
+    fi
 
     # Install all plugins from fish_plugins
     if [ -f ~/.config/fish/fish_plugins ]; then
