@@ -1,6 +1,6 @@
-# Remote Linux Development Setup
+# Remote Linux Development Setup (tested on Ubuntu24.04)
 
-This directory contains setup scripts for configuring remote Linux machines to work with clipboard integration via OSC 52.
+This directory contains setup scripts for configuring remote Linux machines.
 
 ## Scenario
 
