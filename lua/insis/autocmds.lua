@@ -20,6 +20,55 @@ autocmd("ColorScheme", {
 -- Also apply immediately for initial load
 set_inactive_highlights()
 
+-- Track whether Neovim has focus (for tmux integration)
+local nvim_has_focus = true
+
+-- Helper to dim all windows (when Neovim loses focus to tmux)
+local function dim_all_windows()
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    vim.api.nvim_win_call(win, function()
+      vim.wo.winhighlight = "Normal:NormalNC,LineNr:LineNrNC,SignColumn:SignColumnNC"
+      vim.wo.cursorline = false
+    end)
+  end
+end
+
+-- Helper to restore active window highlight
+local function restore_active_window()
+  local current_win = vim.api.nvim_get_current_win()
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    vim.api.nvim_win_call(win, function()
+      if win == current_win then
+        vim.wo.winhighlight = ""
+        vim.wo.cursorline = true
+      else
+        vim.wo.winhighlight = "Normal:NormalNC,LineNr:LineNrNC,SignColumn:SignColumnNC"
+        vim.wo.cursorline = false
+      end
+    end)
+  end
+end
+
+-- Handle focus lost (e.g., navigating to tmux pane)
+autocmd("FocusLost", {
+  group = myAutoGroup,
+  pattern = "*",
+  callback = function()
+    nvim_has_focus = false
+    dim_all_windows()
+  end,
+})
+
+-- Handle focus gained (e.g., navigating back from tmux pane)
+autocmd("FocusGained", {
+  group = myAutoGroup,
+  pattern = "*",
+  callback = function()
+    nvim_has_focus = true
+    restore_active_window()
+  end,
+})
+
 -- Apply winhighlight for inactive windows to affect line numbers
 autocmd({ "WinLeave" }, {
   group = myAutoGroup,
@@ -32,7 +81,10 @@ autocmd({ "WinEnter", "BufEnter" }, {
   group = myAutoGroup,
   pattern = "*",
   callback = function()
-    vim.wo.winhighlight = ""
+    -- Only restore active highlight if Neovim has focus
+    if nvim_has_focus then
+      vim.wo.winhighlight = ""
+    end
   end,
 })
 
@@ -41,7 +93,10 @@ autocmd({ "WinEnter", "BufEnter" }, {
   group = myAutoGroup,
   pattern = "*",
   callback = function()
-    vim.wo.cursorline = true
+    -- Only show cursorline if Neovim has focus
+    if nvim_has_focus then
+      vim.wo.cursorline = true
+    end
   end,
 })
 autocmd({ "WinLeave" }, {
