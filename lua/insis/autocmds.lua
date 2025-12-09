@@ -5,6 +5,53 @@ local myAutoGroup = vim.api.nvim_create_augroup("myAutoGroup", {
 
 local autocmd = vim.api.nvim_create_autocmd
 
+-- Option 1: Dim inactive windows (apply after colorscheme loads)
+-- Use a lighter/grayer background for inactive windows to make active window pop
+local function set_inactive_highlights()
+  vim.api.nvim_set_hl(0, "NormalNC", { bg = "#181820" })
+  vim.api.nvim_set_hl(0, "LineNrNC", { bg = "#181820", fg = "#3a3a4a" })
+  vim.api.nvim_set_hl(0, "SignColumnNC", { bg = "#181820" })
+end
+autocmd("ColorScheme", {
+  group = myAutoGroup,
+  pattern = "*",
+  callback = set_inactive_highlights,
+})
+-- Also apply immediately for initial load
+set_inactive_highlights()
+
+-- Apply winhighlight for inactive windows to affect line numbers
+autocmd({ "WinLeave" }, {
+  group = myAutoGroup,
+  pattern = "*",
+  callback = function()
+    vim.wo.winhighlight = "Normal:NormalNC,LineNr:LineNrNC,SignColumn:SignColumnNC"
+  end,
+})
+autocmd({ "WinEnter", "BufEnter" }, {
+  group = myAutoGroup,
+  pattern = "*",
+  callback = function()
+    vim.wo.winhighlight = ""
+  end,
+})
+
+-- Option 2: Only show cursorline of the active window
+autocmd({ "WinEnter", "BufEnter" }, {
+  group = myAutoGroup,
+  pattern = "*",
+  callback = function()
+    vim.wo.cursorline = true
+  end,
+})
+autocmd({ "WinLeave" }, {
+  group = myAutoGroup,
+  pattern = "*",
+  callback = function()
+    vim.wo.cursorline = false
+  end,
+})
+
 if cfg.enable_imselect then
   autocmd("InsertLeave", {
     group = myAutoGroup,
