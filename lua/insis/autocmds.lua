@@ -8,9 +8,9 @@ local autocmd = vim.api.nvim_create_autocmd
 -- Option 1: Dim inactive windows (apply after colorscheme loads)
 -- Use a lighter/grayer background for inactive windows to make active window pop
 local function set_inactive_highlights()
-  vim.api.nvim_set_hl(0, "NormalNC", { bg = "#181820" })
-  vim.api.nvim_set_hl(0, "LineNrNC", { bg = "#181820", fg = "#3a3a4a" })
-  vim.api.nvim_set_hl(0, "SignColumnNC", { bg = "#181820" })
+  vim.api.nvim_set_hl(0, "NormalNC", { bg = "#16161e" })
+  vim.api.nvim_set_hl(0, "LineNrNC", { bg = "#16161e", fg = "#3a3a4a" })
+  vim.api.nvim_set_hl(0, "SignColumnNC", { bg = "#16161e" })
 end
 autocmd("ColorScheme", {
   group = myAutoGroup,
