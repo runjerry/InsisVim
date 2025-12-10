@@ -23,6 +23,15 @@ set_inactive_highlights()
 -- Track whether Neovim has focus (for tmux integration)
 local nvim_has_focus = true
 
+-- Helper to dim/restore bufferline selected tab
+local function dim_bufferline()
+  vim.api.nvim_set_hl(0, "BufferLineBufferSelected", { fg = "#6a6a7a", bg = "#16161e", bold = false, italic = false })
+end
+
+local function restore_bufferline()
+  vim.api.nvim_set_hl(0, "BufferLineBufferSelected", { fg = "#e6f2ff", bg = "#5a5a5a", bold = true, italic = true })
+end
+
 -- Helper to dim all windows (when Neovim loses focus to tmux)
 local function dim_all_windows()
   for _, win in ipairs(vim.api.nvim_list_wins()) do
@@ -56,6 +65,7 @@ autocmd("FocusLost", {
   callback = function()
     nvim_has_focus = false
     dim_all_windows()
+    dim_bufferline()
   end,
 })
 
@@ -66,6 +76,7 @@ autocmd("FocusGained", {
   callback = function()
     nvim_has_focus = true
     restore_active_window()
+    restore_bufferline()
   end,
 })
 
