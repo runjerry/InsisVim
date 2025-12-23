@@ -44,6 +44,11 @@ end
 alias vim="nvim"
 alias vi="nvim"
 
+# set vim as default editor
+set -gx EDITOR vim
+set -gx VISUAL vim
+
+
 # SSH Agent setup for Fish + Tmux
 # Only start agent if SSH_AUTH_SOCK is not already set (e.g., from agent forwarding)
 if test -z "$SSH_AUTH_SOCK"
