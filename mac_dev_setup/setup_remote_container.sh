@@ -352,24 +352,30 @@ setup_fish_shell() {
         print_success "Fish already in allowed shells"
     fi
 
-    # In Docker/RunPod, chsh often doesn't work properly
-    # Use .bashrc to auto-launch fish for interactive sessions
-    if ask_yes_no "Auto-start Fish when opening bash? (recommended for containers)"; then
-        if ! grep -q "exec fish" ~/.bashrc 2>/dev/null; then
-            print_info "Adding Fish auto-start to .bashrc..."
-            cat >> ~/.bashrc << 'EOF'
+    # Try chsh first, fall back to .bashrc if it fails
+    if ask_yes_no "Set Fish as your default shell?"; then
+        print_info "Trying chsh to set default shell..."
+        if $USE_SUDO chsh -s "$FISH_PATH" 2>/dev/null; then
+            print_success "Default shell set to Fish via chsh"
+        else
+            # chsh failed, fall back to .bashrc method
+            print_warning "chsh failed, falling back to .bashrc auto-start method"
+            if ! grep -q "exec fish" ~/.bashrc 2>/dev/null; then
+                print_info "Adding Fish auto-start to .bashrc..."
+                cat >> ~/.bashrc << 'EOF'
 
 # Auto-start fish shell (added by setup script)
 if command -v fish &> /dev/null && [ -z "$FISH_VERSION" ]; then
     exec fish
 fi
 EOF
-            print_success "Fish will auto-start on login"
-        else
-            print_success "Fish auto-start already configured in .bashrc"
+                print_success "Fish will auto-start on login via .bashrc"
+            else
+                print_success "Fish auto-start already configured in .bashrc"
+            fi
         fi
     else
-        print_warning "Fish won't auto-start. Run 'fish' manually or 'exec fish'"
+        print_warning "Fish won't be default. Run 'fish' manually or 'exec fish'"
     fi
 }
 
@@ -586,7 +592,14 @@ install_additional_tools() {
         if ask_yes_no "Install Claude Code CLI?"; then
             print_info "Installing Claude Code..."
             curl -fsSL https://claude.ai/install.sh | bash
-            print_success "Claude Code installed"
+            # Add ~/.local/bin to fish PATH (where Claude Code is installed)
+            if command_exists fish; then
+                fish -c "fish_add_path ~/.local/bin" 2>/dev/null || true
+                print_success "Claude Code installed and added to fish PATH"
+            else
+                print_success "Claude Code installed"
+                print_warning "Add ~/.local/bin to your PATH manually"
+            fi
         else
             print_warning "Skipping Claude Code"
         fi
