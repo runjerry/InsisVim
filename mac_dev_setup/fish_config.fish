@@ -48,6 +48,13 @@ alias vi="nvim"
 set -gx EDITOR vim
 set -gx VISUAL vim
 
+# SSH Agent forwarding fix for tmux
+# When SSH_AUTH_SOCK is set (forwarded agent), create a stable symlink
+# so tmux sessions can find the agent after reconnecting
+if test -n "$SSH_AUTH_SOCK" -a "$SSH_AUTH_SOCK" != "$HOME/.ssh/agent_sock"
+    ln -sf "$SSH_AUTH_SOCK" "$HOME/.ssh/agent_sock"
+    set -gx SSH_AUTH_SOCK "$HOME/.ssh/agent_sock"
+end
 
 # SSH Agent setup for Fish + Tmux
 # Only start agent if SSH_AUTH_SOCK is not already set (e.g., from agent forwarding)
