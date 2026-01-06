@@ -439,6 +439,19 @@ setup_fish_config_and_plugins() {
     else
         print_warning "fish_plugins not found, skipping plugin installation"
     fi
+
+    # Add container-specific environment variables to fish config
+    if ! grep -q "PIP_BREAK_SYSTEM_PACKAGES" ~/.config/fish/config.fish 2>/dev/null; then
+        print_info "Adding container-specific env vars to fish config..."
+        cat >> ~/.config/fish/config.fish << 'EOF'
+
+# Allow pip to install system-wide in containers
+set -gx PIP_BREAK_SYSTEM_PACKAGES 1
+EOF
+        print_success "Added PIP_BREAK_SYSTEM_PACKAGES to fish config"
+    else
+        print_success "PIP_BREAK_SYSTEM_PACKAGES already in fish config"
+    fi
 }
 
 #######################################
