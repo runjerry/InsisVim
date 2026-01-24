@@ -48,12 +48,45 @@ alias vi="nvim"
 set -gx EDITOR vim
 set -gx VISUAL vim
 
+# Allow pip to install system-wide in containers
+set -gx PIP_BREAK_SYSTEM_PACKAGES 1
+
+# add anthropic api key
+
 # SSH Agent forwarding fix for tmux
 # When SSH_AUTH_SOCK is set (forwarded agent), create a stable symlink
 # so tmux sessions can find the agent after reconnecting
 if test -n "$SSH_AUTH_SOCK" -a "$SSH_AUTH_SOCK" != "$HOME/.ssh/agent_sock"
     ln -sf "$SSH_AUTH_SOCK" "$HOME/.ssh/agent_sock"
     set -gx SSH_AUTH_SOCK "$HOME/.ssh/agent_sock"
+end
+
+# Fix stale SSH agent socket (e.g., after tmux reattach)
+# If current socket doesn't work, find a working one
+function fix_ssh_agent --description "Find and use a working SSH agent socket"
+    # First check if current socket works
+    if ssh-add -l >/dev/null 2>&1
+        return 0
+    end
+
+    # Current socket is stale, find a working one
+    for sock in /tmp/ssh-*/agent.*
+        if test -S "$sock"
+            if SSH_AUTH_SOCK=$sock ssh-add -l >/dev/null 2>&1
+                ln -sf "$sock" "$HOME/.ssh/agent_sock"
+                set -gx SSH_AUTH_SOCK "$HOME/.ssh/agent_sock"
+                return 0
+            end
+        end
+    end
+    return 1
+end
+
+# Auto-fix on shell startup if socket seems stale
+if test -n "$SSH_AUTH_SOCK"
+    if not ssh-add -l >/dev/null 2>&1
+        fix_ssh_agent
+    end
 end
 
 # SSH Agent setup for Fish + Tmux
