@@ -124,6 +124,12 @@ install_core_tools() {
         print_success "Git already installed: $(git --version)"
     fi
 
+    # Configure git user identity
+    print_info "Configuring git user identity..."
+    git config --global user.email "qinxun@gmail.com"
+    git config --global user.name "Jerry Bai"
+    print_success "Git configured: Jerry Bai <qinxun@gmail.com>"
+
     # Fish shell
     if ! command_exists fish; then
         if ask_yes_no "Install Fish shell?"; then

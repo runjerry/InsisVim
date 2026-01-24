@@ -183,6 +183,12 @@ install_base_if_needed() {
     install_if_missing curl
     install_if_missing wget
     install_if_missing git
+
+    # Configure git user identity
+    print_info "Configuring git user identity..."
+    git config --global user.email "qinxun@gmail.com"
+    git config --global user.name "Jerry Bai"
+    print_success "Git configured: Jerry Bai <qinxun@gmail.com>"
 }
 
 #######################################
