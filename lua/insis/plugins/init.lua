@@ -340,18 +340,18 @@ return {
   },
 
   ----------------- ai ---------------------------
-  {
-    "zbirenbaum/copilot.lua",
-    config = function()
-      require("insis.plugins.copilot").copilot()
-    end,
-  },
-  {
-    "zbirenbaum/copilot-cmp",
-    config = function()
-      require("insis.plugins.copilot").copilot_cmp()
-    end,
-  },
+  -- {
+  --   "zbirenbaum/copilot.lua",
+  --   config = function()
+  --     require("insis.plugins.copilot").copilot()
+  --   end,
+  -- },
+  -- {
+  --   "zbirenbaum/copilot-cmp",
+  --   config = function()
+  --     require("insis.plugins.copilot").copilot_cmp()
+  --   end,
+  -- },
   -- Codeium
   {
     "Exafunction/codeium.nvim",
