@@ -44,9 +44,9 @@ end
 alias vim="nvim"
 alias vi="nvim"
 
-# set vim as default editor
-set -gx EDITOR vim
-set -gx VISUAL vim
+# set nvim as default editor
+set -gx EDITOR nvim
+set -gx VISUAL nvim
 
 # Allow pip to install system-wide in containers
 set -gx PIP_BREAK_SYSTEM_PACKAGES 1

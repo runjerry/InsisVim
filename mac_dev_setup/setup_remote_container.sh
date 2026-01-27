@@ -183,6 +183,7 @@ install_base_if_needed() {
     install_if_missing curl
     install_if_missing wget
     install_if_missing git
+    install_if_missing less  # Required for git pager (git log, git diff, etc.)
 
     # Configure git user identity
     print_info "Configuring git user identity..."
