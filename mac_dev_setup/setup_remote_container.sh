@@ -165,9 +165,9 @@ detect_package_manager() {
 install_base_if_needed() {
     print_step "Step 2: Checking Base Dependencies"
 
-    # Only update package lists if we need to install something
+    # Update package lists if any base dependency is missing
     local need_update=false
-    for cmd in curl wget git; do
+    for cmd in curl wget git less; do
         if ! command_exists "$cmd"; then
             need_update=true
             break
