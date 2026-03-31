@@ -1,6 +1,9 @@
 if status is-interactive
     # Commands to run in interactive sessions can go here
 
+    # Add npm global bin to PATH (for cclsp and other global npm packages)
+    fish_add_path /root/.node_modules/bin
+
     # Use ripgrep for Ctrl+T to search files (faster than default find)
     set -gx FZF_CTRL_T_COMMAND 'rg --files --hidden --follow --glob "!.git" 2>/dev/null'
 
