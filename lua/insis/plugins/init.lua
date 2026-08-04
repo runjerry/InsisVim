@@ -245,7 +245,8 @@ return {
 
   -- TypeScript
   -- { "jose-elias-alvarez/nvim-lsp-ts-utils", requires = "nvim-lua/plenary.nvim" },
-  { "jose-elias-alvarez/typescript.nvim" },
+  -- repo deleted (author removed their GitHub account); use pmizio/typescript-tools.nvim if needed
+  -- { "jose-elias-alvarez/typescript.nvim" },
   -- JSON
   { "b0o/schemastore.nvim" },
   -- Rust
