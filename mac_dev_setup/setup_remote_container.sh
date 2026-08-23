@@ -31,6 +31,7 @@ NVIM_CONFIG_REPO="git@github.com:runjerry/InsisVim.git"
 NVIM_CONFIG_BRANCH="remote-setup"  # Change this if you want a different branch
 NEOVIM_VERSION="v0.9.5"
 AUTO_YES=false
+SETUP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Parse command line arguments
 while getopts "y" opt; do
@@ -590,6 +591,47 @@ setup_neovim_config() {
 # Step 9: Install Additional Tools
 #######################################
 
+setup_claude_settings() {
+    local target="$HOME/.claude/settings.json"
+
+    if [ -f "$target" ]; then
+        print_success "Claude settings already exist, leaving unchanged"
+        return
+    fi
+
+    mkdir -p "$HOME/.claude"
+
+    if [ -f "$SETUP_SCRIPT_DIR/claude_settings.json" ]; then
+        print_info "Copying Claude settings from local directory..."
+        install -m 600 "$SETUP_SCRIPT_DIR/claude_settings.json" "$target"
+    else
+        local repo_path="${NVIM_CONFIG_REPO#git@github.com:}"
+        repo_path="${repo_path%.git}"
+
+        local tmp_file
+        tmp_file="$(mktemp)"
+
+        print_info "Downloading Claude settings from GitHub..."
+        if curl -fsSL \
+            "https://raw.githubusercontent.com/${repo_path}/${NVIM_CONFIG_BRANCH}/mac_dev_setup/claude_settings.json" \
+            -o "$tmp_file"; then
+            if ! install -m 600 "$tmp_file" "$target"; then
+                rm -f "$tmp_file"
+                print_error "Failed to install Claude settings"
+                return 1
+            fi
+        else
+            print_warning "Failed to download Claude settings"
+        fi
+
+        rm -f "$tmp_file"
+    fi
+
+    if [ -f "$target" ]; then
+        print_success "Claude settings installed at $target"
+    fi
+}
+
 install_additional_tools() {
     print_step "Step 9: Installing Additional LSPs/Formatters (Optional)"
 
@@ -625,6 +667,10 @@ install_additional_tools() {
         fi
     else
         print_success "Claude Code already installed"
+    fi
+
+    if command_exists claude || [ -x "$HOME/.local/bin/claude" ]; then
+        setup_claude_settings
     fi
 
     # Add more tools as needed
