@@ -502,6 +502,16 @@ setup_fish_shell() {
 if [[ $- == *i* ]] && command -v fish >/dev/null 2>&1 && [ -z "${FISH_VERSION:-}" ]; then
     _cmux_parent_shell="$(ps -p "$PPID" -o comm= 2>/dev/null | tr -d '[:space:]')"
     if [ "$_cmux_parent_shell" != "fish" ]; then
+        # cmux ssh generates a per-workspace Fish config that reports PWD,
+        # shell activity, ports and TTY state. Launch Fish through it while
+        # retaining the user's real Fish config directory.
+        if [ -n "${CMUX_SHELL_INTEGRATION_DIR:-}" ] &&
+           [ -r "$CMUX_SHELL_INTEGRATION_DIR/fish/config.fish" ]; then
+            if [ "${XDG_CONFIG_HOME:-}" != "$CMUX_SHELL_INTEGRATION_DIR" ]; then
+                export CMUX_FISH_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+                export XDG_CONFIG_HOME="$CMUX_SHELL_INTEGRATION_DIR"
+            fi
+        fi
         unset _cmux_parent_shell
         exec fish
     fi
@@ -594,18 +604,45 @@ EOF
         print_success "PIP_BREAK_SYSTEM_PACKAGES already in fish config"
     fi
 
-    # cmux installs its remote CLI relay under ~/.cmux/bin on first `cmux ssh`.
-    # Keep the path configured even before the relay exists.
+    # cmux installs its relay and a per-workspace Fish integration on
+    # `cmux ssh`. The integration reports PWD so the Files surface follows
+    # navigation in the outer Fish shell. Load it additively when Fish was
+    # started normally rather than through cmux's injected XDG config.
     mkdir -p ~/.config/fish/conf.d
-    if [ ! -e ~/.config/fish/conf.d/99-cmux.fish ]; then
-        cat > ~/.config/fish/conf.d/99-cmux.fish << 'EOF'
-# cmux remote CLI relay (installed automatically by `cmux ssh`)
+    local cmux_fish="$HOME/.config/fish/conf.d/99-cmux.fish"
+
+    if [ ! -e "$cmux_fish" ]; then
+        cat > "$cmux_fish" << 'EOF'
+# cmux remote integration (installed automatically by `cmux ssh`)
 fish_add_path $HOME/.cmux/bin
 EOF
-        print_success "cmux remote CLI path configured for Fish"
-    else
-        print_success "Existing cmux Fish PATH configuration preserved"
     fi
+
+    if ! grep -Eq 'fish_add_path.*\.cmux/bin' "$cmux_fish" 2>/dev/null; then
+        printf '\nfish_add_path $HOME/.cmux/bin\n' >> "$cmux_fish"
+    fi
+
+    if ! grep -Fq '# cmux-phase-a-shell-integration-v2' "$cmux_fish" 2>/dev/null; then
+        cat >> "$cmux_fish" << 'EOF'
+
+# cmux-phase-a-shell-integration-v2
+# A normal `exec fish` bypasses cmux's injected Fish config. Source that
+# integration after marking the user's config as already loaded, preventing
+# it from recursively sourcing this file/config.fish again.
+if set -q CMUX_SHELL_INTEGRATION_DIR
+    set -l _cmux_fish_integration "$CMUX_SHELL_INTEGRATION_DIR/fish/config.fish"
+    if test -r "$_cmux_fish_integration"; and not functions -q _cmux_prompt
+        set -g CMUX_FISH_USER_CONFIG_ALREADY_LOADED 1
+        source "$_cmux_fish_integration"
+        set -e CMUX_FISH_USER_CONFIG_ALREADY_LOADED
+    end
+    set -e _cmux_fish_integration
+end
+EOF
+    fi
+
+    chmod 644 "$cmux_fish"
+    print_success "cmux relay PATH and Fish PWD reporting configured"
 }
 
 #######################################
