@@ -37,7 +37,6 @@ TMUX_SOURCE_VERSION="3.4"
 TMUX_SOURCE_SHA256="551ab8dea0bf505c0ad6b7bb35ef567cdde0ccb84357df142c254f35a23e19aa"
 AUTO_YES=false
 FORCE=false
-FISH_INSTALLED_BY_SCRIPT=false
 SETUP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Parse command line arguments
@@ -344,7 +343,6 @@ install_core_tools() {
                 update_package_lists 2>/dev/null || true
             fi
             $INSTALL_CMD fish
-            FISH_INSTALLED_BY_SCRIPT=true
             print_success "Fish installed"
         else
             print_warning "Skipping Fish installation"
@@ -586,11 +584,10 @@ setup_fish_shell() {
     if [ "$FORCE" = true ]; then
         configure_default=true
     elif [ "$AUTO_YES" = true ]; then
-        if [ "$FISH_INSTALLED_BY_SCRIPT" = true ]; then
-            configure_default=true
-        else
-            print_warning "Fish pre-existed without a managed default-shell setting; preserving login shell"
-        fi
+        # On a fresh RunPod image Fish may already be installed. The absence
+        # of an established Fish/tmux workflow above means it still needs to
+        # become the default shell.
+        configure_default=true
     elif ask_yes_no "Set Fish as your default shell?"; then
         configure_default=true
     fi
@@ -600,6 +597,7 @@ setup_fish_shell() {
         print_info "Trying chsh to set default shell..."
         if command_exists chsh && $USE_SUDO chsh -s "$FISH_PATH" "$(id -un)" 2>/dev/null; then
             print_success "Default shell set to Fish via chsh"
+            print_info "Reconnect, or run 'exec fish' in the current shell before starting tmux"
         else
             # chsh failed, fall back to .bashrc method
             print_warning "chsh failed, falling back to .bashrc auto-start method"
@@ -898,8 +896,22 @@ install_neovim() {
 setup_neovim_config() {
     print_step "Step 8: Setting up Neovim Configuration"
 
+    local config_dir="$HOME/.config/nvim"
+
+    # This script is commonly committed inside the Neovim config repository.
+    # Never delete the checkout that contains the currently executing script.
+    case "$SETUP_SCRIPT_DIR/" in
+        "$config_dir/"*)
+            print_success "Running from the Neovim config checkout; preserving it"
+            if [ "$FORCE" = true ]; then
+                print_warning "Neovim config replacement skipped: copy this script outside ~/.config/nvim before using -f"
+            fi
+            return
+            ;;
+    esac
+
     # Clean up existing nvim configs only after explicit replacement consent.
-    if [ -d ~/.config/nvim ] || [ -d ~/.local/share/nvim ] || [ -d ~/.cache/nvim ]; then
+    if [ -d "$config_dir" ] || [ -d ~/.local/share/nvim ] || [ -d ~/.cache/nvim ]; then
         print_warning "Existing Neovim configuration detected"
         if ask_reconfigure "Remove existing Neovim config/data/cache and start fresh?"; then
             print_info "Removing existing Neovim data..."
@@ -907,7 +919,7 @@ setup_neovim_config() {
             rm -rf ~/.cache/nvim
             rm -rf ~/.config/nvim
             print_success "Existing configs removed"
-        elif [ -d ~/.config/nvim ]; then
+        elif [ -d "$config_dir" ]; then
             print_success "Existing Neovim config/data/cache preserved"
             return
         else
@@ -916,7 +928,7 @@ setup_neovim_config() {
     fi
 
     # Clone nvim config repository
-    if [ ! -d ~/.config/nvim ]; then
+    if [ ! -d "$config_dir" ]; then
         local repo_path="${NVIM_CONFIG_REPO#git@github.com:}"
         local https_repo
         repo_path="${repo_path%.git}"
@@ -924,11 +936,11 @@ setup_neovim_config() {
 
         print_info "Cloning Neovim config branch $NVIM_CONFIG_BRANCH..."
         if ! git clone --branch "$NVIM_CONFIG_BRANCH" --single-branch \
-            "$https_repo" ~/.config/nvim; then
-            rm -rf ~/.config/nvim
+            "$https_repo" "$config_dir"; then
+            rm -rf "$config_dir"
             print_warning "HTTPS clone failed; trying the configured repository URL"
             git clone --branch "$NVIM_CONFIG_BRANCH" --single-branch \
-                "$NVIM_CONFIG_REPO" ~/.config/nvim
+                "$NVIM_CONFIG_REPO" "$config_dir"
         fi
         print_success "Neovim config cloned (branch: $NVIM_CONFIG_BRANCH)"
     else
@@ -937,6 +949,66 @@ setup_neovim_config() {
 
     print_warning "First launch of Neovim will install plugins automatically"
     print_info "This may take a few minutes..."
+}
+
+count_missing_locked_neovim_plugins() {
+    local lock_file="$HOME/.config/nvim/lazy-lock.json"
+    local lazy_root="$HOME/.local/share/nvim/lazy"
+    local plugin
+    local count=0
+
+    while IFS= read -r plugin; do
+        if [ ! -d "$lazy_root/$plugin" ]; then
+            count=$((count + 1))
+        fi
+    done < <(jq -r 'keys[]' "$lock_file")
+
+    printf '%s\n' "$count"
+}
+
+install_missing_neovim_plugins() {
+    print_step "Step 8b: Installing Missing Neovim Plugins"
+
+    local config_dir="$HOME/.config/nvim"
+    local lock_file="$config_dir/lazy-lock.json"
+    local missing_count
+    local verify_command
+
+    if ! command_exists nvim; then
+        print_warning "Neovim is unavailable; skipping plugin installation"
+        return 0
+    fi
+
+    # Do not run Lazy commands against an unrelated pre-existing Neovim config.
+    if [ ! -f "$config_dir/lua/insis/lazy.lua" ]; then
+        print_warning "Existing Neovim config is not the managed InsisVim layout; preserving it"
+        return 0
+    fi
+
+    if ! jq -e 'type == "object"' "$lock_file" >/dev/null 2>&1; then
+        print_error "Missing or invalid Neovim plugin lock file: $lock_file"
+        return 1
+    fi
+
+    missing_count="$(count_missing_locked_neovim_plugins)"
+    if [ "$missing_count" -eq 0 ]; then
+        print_success "All lockfile-pinned Neovim plugins are already present"
+        return 0
+    fi
+
+    print_info "Installing missing enabled Neovim plugins at lockfile-pinned revisions..."
+    verify_command='lua local missing = {}; for name, plugin in pairs(require("lazy.core.config").plugins) do if plugin.url and not plugin._.installed then missing[#missing + 1] = name end end; if #missing > 0 then vim.api.nvim_err_writeln("Missing Lazy plugins: " .. table.concat(missing, ", ")); vim.cmd("cquit 1") end'
+
+    if ! GIT_TERMINAL_PROMPT=0 nvim --headless \
+        "+Lazy! install" \
+        "+$verify_command" \
+        +qa; then
+        print_error "Headless Neovim plugin installation failed"
+        print_info "Retry manually with: nvim --headless '+Lazy! install' +qa"
+        return 1
+    fi
+
+    print_success "All enabled lockfile-pinned Neovim plugins are installed"
 }
 
 #######################################
@@ -1741,6 +1813,7 @@ main() {
     setup_tmux
     install_neovim
     setup_neovim_config
+    install_missing_neovim_plugins
     install_additional_tools
     setup_cmux_phase_a_integration
     setup_mdview_helpers
@@ -1752,8 +1825,8 @@ main() {
     echo ""
     print_info "Next steps:"
     echo "  1. From the Mac, connect with: cmux ssh <host> --name <project>"
-    echo "  2. Start a new Fish shell if needed: exec fish (or reconnect)"
-    echo "  3. Start/attach tmux: tmux new-session -A -s <session>"
+    echo "  2. Before entering tmux in this connection, run: exec fish (or reconnect)"
+    echo "  3. From Fish, start/attach tmux: tmux new-session -A -s <session>"
     echo "  4. Install tmux plugins once: Press Ctrl+a then Shift+I"
     echo "  5. Start neovim / Claude Code / Codex inside tmux"
     echo "  6. In nvim, run: :checkhealth provider"
