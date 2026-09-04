@@ -13,10 +13,8 @@
 #   <C-c> in remote nvim -> paste on local macOS with Cmd+V
 #
 # Usage:
-#   Interactive mode:          ./setup_remote_container_cmux_phase_a.sh
-#   Safe non-interactive mode: ./setup_remote_container_cmux_phase_a.sh -y
-#   Explicit replacements:     ./setup_remote_container_cmux_phase_a.sh -f
-#   Non-interactive + replace: ./setup_remote_container_cmux_phase_a.sh -yf
+#   Interactive mode:  ./setup_remote_container_cmux_phase_a.sh
+#   Non-interactive:   ./setup_remote_container_cmux_phase_a.sh -y
 
 set -e  # Exit on error
 
@@ -33,18 +31,20 @@ NVIM_CONFIG_REPO="git@github.com:runjerry/InsisVim.git"
 NVIM_CONFIG_BRANCH="remote-setup"  # Change this if you want a different branch
 NEOVIM_VERSION="v0.9.5"
 NEOVIM_LINUX64_SHA256="44ee395d9b5f8a14be8ec00d3b8ead34e18fe6461e40c9c8c50e6956d643b6ca"
-TMUX_SOURCE_VERSION="3.4"
 TMUX_SOURCE_SHA256="551ab8dea0bf505c0ad6b7bb35ef567cdde0ccb84357df142c254f35a23e19aa"
+MDPREV_VERSION="0.1.1"
 AUTO_YES=false
-FORCE=false
 SETUP_SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Make user-local tools installed by the baseline setup visible immediately in
+# this run; Fish persists the same paths for future sessions.
+export PATH="$HOME/.local/bin:$HOME/.node_modules/bin:$PATH"
+
 # Parse command line arguments
-while getopts "yf" opt; do
+while getopts "y" opt; do
     case $opt in
         y) AUTO_YES=true ;;
-        f) FORCE=true ;;
-        *) echo "Usage: $0 [-y] [-f]"; exit 1 ;;
+        *) echo "Usage: $0 [-y]"; exit 1 ;;
     esac
 done
 
@@ -101,61 +101,6 @@ ask_yes_no() {
     done
 }
 
-# Replacement/removal is never implied by -y. In interactive mode it is
-# individually confirmed; -f is the explicit non-interactive opt-in.
-ask_reconfigure() {
-    if [ "$FORCE" = true ]; then
-        return 0
-    fi
-    if [ "$AUTO_YES" = true ]; then
-        return 1
-    fi
-    ask_yes_no "$1"
-}
-
-backup_file() {
-    local source="$1"
-    local backup
-
-    backup="$(mktemp "${source}.backup.$(date +%Y%m%d_%H%M%S).XXXXXX")"
-    cp -p -- "$source" "$backup"
-    print_warning "Backed up $source to $backup"
-}
-
-stage_setup_file() {
-    local filename="$1"
-    local destination="$2"
-    local repo_path
-
-    if [ -f "$SETUP_SCRIPT_DIR/$filename" ]; then
-        cp -- "$SETUP_SCRIPT_DIR/$filename" "$destination"
-        return 0
-    fi
-
-    repo_path="${NVIM_CONFIG_REPO#git@github.com:}"
-    repo_path="${repo_path%.git}"
-    curl -fsSL \
-        "https://raw.githubusercontent.com/${repo_path}/${NVIM_CONFIG_BRANCH}/mac_dev_setup/${filename}" \
-        -o "$destination"
-}
-
-should_install_managed_file() {
-    local target="$1"
-    local label="$2"
-
-    if [ ! -e "$target" ]; then
-        return 0
-    fi
-
-    if ask_reconfigure "Replace the existing $label?"; then
-        backup_file "$target"
-        return 0
-    fi
-
-    print_success "Existing $label preserved"
-    return 1
-}
-
 # Helper to install a package only if the command is missing
 install_if_missing() {
     local cmd="$1"
@@ -199,14 +144,14 @@ detect_package_manager() {
         PKG_MANAGER="apt-get"
         INSTALL_CMD="$USE_SUDO apt-get install -y"
         print_success "Detected: apt-get (Debian/Ubuntu)"
-    elif command_exists dnf; then
-        PKG_MANAGER="dnf"
-        INSTALL_CMD="$USE_SUDO dnf install -y"
-        print_success "Detected: dnf (Fedora)"
     elif command_exists yum; then
         PKG_MANAGER="yum"
         INSTALL_CMD="$USE_SUDO yum install -y"
         print_success "Detected: yum (RHEL/CentOS)"
+    elif command_exists dnf; then
+        PKG_MANAGER="dnf"
+        INSTALL_CMD="$USE_SUDO dnf install -y"
+        print_success "Detected: dnf (Fedora)"
     elif command_exists pacman; then
         PKG_MANAGER="pacman"
         INSTALL_CMD="$USE_SUDO pacman -S --noconfirm"
@@ -247,7 +192,7 @@ install_base_if_needed() {
 
     # Update package lists if any base dependency is missing
     local need_update=false
-    for cmd in curl wget git less jq ss ps realpath nohup sha256sum cmp awk tar gzip fish rg unzip tmux node npm npx; do
+    for cmd in curl wget git less jq ss ps realpath nohup cmp sha256sum tar gzip make cc; do
         if ! command_exists "$cmd"; then
             need_update=true
             break
@@ -267,63 +212,49 @@ install_base_if_needed() {
     install_if_missing jq    # Required by Claude/Codex cmux notification bridges
 
     case "$PKG_MANAGER" in
-        apt-get|pacman)
+        apt-get)
             install_if_missing ss iproute2
             install_if_missing ps procps
+            install_if_missing realpath coreutils
+            install_if_missing nohup coreutils
+            install_if_missing cmp diffutils
+            install_if_missing sha256sum coreutils
+            install_if_missing tar tar
+            install_if_missing gzip gzip
+            install_if_missing make build-essential
+            install_if_missing cc build-essential
             ;;
         yum|dnf)
             install_if_missing ss iproute
             install_if_missing ps procps-ng
+            install_if_missing realpath coreutils
+            install_if_missing nohup coreutils
+            install_if_missing cmp diffutils
+            install_if_missing sha256sum coreutils
+            install_if_missing tar tar
+            install_if_missing gzip gzip
+            install_if_missing make make
+            install_if_missing cc gcc
+            ;;
+        pacman)
+            install_if_missing ss iproute2
+            install_if_missing ps procps-ng
+            install_if_missing realpath coreutils
+            install_if_missing nohup coreutils
+            install_if_missing cmp diffutils
+            install_if_missing sha256sum coreutils
+            install_if_missing tar tar
+            install_if_missing gzip gzip
+            install_if_missing make base-devel
+            install_if_missing cc base-devel
             ;;
     esac
-    install_if_missing realpath coreutils
-    install_if_missing nohup coreutils
-    install_if_missing sha256sum coreutils
-    install_if_missing cmp diffutils
-    install_if_missing awk gawk
-    install_if_missing tar
-    install_if_missing gzip
 
-    configure_git_identity
-}
-
-configure_git_identity() {
-    local desired_name="Jerry Bai"
-    local desired_email="qinxun@gmail.com"
-    local current_name
-    local current_email
-    local has_difference=false
-
-    current_name="$(git config --global --get user.name 2>/dev/null || true)"
-    current_email="$(git config --global --get user.email 2>/dev/null || true)"
-
-    if [ -z "$current_name" ]; then
-        git config --global user.name "$desired_name"
-        current_name="$desired_name"
-        print_success "Configured missing global Git user.name"
-    elif [ "$current_name" != "$desired_name" ]; then
-        has_difference=true
-    fi
-
-    if [ -z "$current_email" ]; then
-        git config --global user.email "$desired_email"
-        current_email="$desired_email"
-        print_success "Configured missing global Git user.email"
-    elif [ "$current_email" != "$desired_email" ]; then
-        has_difference=true
-    fi
-
-    if [ "$has_difference" = true ]; then
-        if ask_reconfigure "Replace the existing global Git identity with this setup's defaults?"; then
-            git config --global user.name "$desired_name"
-            git config --global user.email "$desired_email"
-            print_success "Global Git identity replaced"
-        else
-            print_warning "Existing global Git identity differs; preserving it"
-        fi
-    else
-        print_success "Global Git identity is configured"
-    fi
+    # Configure git user identity
+    print_info "Configuring git user identity..."
+    git config --global user.email "qinxun@gmail.com"
+    git config --global user.name "Jerry Bai"
+    print_success "Git configured: Jerry Bai <qinxun@gmail.com>"
 }
 
 #######################################
@@ -353,14 +284,10 @@ install_core_tools() {
 
     # fzf (install from git for key bindings)
     if ! command_exists fzf; then
-        if [ -d ~/.fzf ]; then
-            print_warning "~/.fzf already exists but fzf is not on PATH; preserving the checkout"
-        else
-            print_info "Installing fzf from git..."
-            git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
-            ~/.fzf/install --all --no-bash --no-zsh  # Only fish shell
-            print_success "fzf installed with key bindings"
-        fi
+        print_info "Installing fzf from git..."
+        git clone --depth 1 https://github.com/junegunn/fzf.git ~/.fzf
+        ~/.fzf/install --all --no-bash --no-zsh  # Only fish shell
+        print_success "fzf installed with key bindings"
     else
         print_success "fzf already installed"
         # Ensure key bindings are installed
@@ -396,12 +323,11 @@ install_core_tools() {
     fi
 
     # tmux (need 3.3+ for OSC 52 allow-passthrough)
-    TMUX_MIN_VERSION="3.3"
     install_tmux_from_source() {
-        local build_root
+        local build_dir
         local archive
 
-        print_info "Building tmux $TMUX_SOURCE_VERSION from source..."
+        print_info "Building tmux 3.4 from source..."
         case "$PKG_MANAGER" in
             apt-get)
                 $INSTALL_CMD libevent-dev ncurses-dev build-essential bison pkg-config autoconf automake
@@ -413,29 +339,27 @@ install_core_tools() {
                 $INSTALL_CMD libevent ncurses base-devel bison pkgconf autoconf automake
                 ;;
         esac
-
-        build_root="$(mktemp -d)"
-        archive="$build_root/tmux-${TMUX_SOURCE_VERSION}.tar.gz"
-        wget -q -O "$archive" \
-            "https://github.com/tmux/tmux/releases/download/${TMUX_SOURCE_VERSION}/tmux-${TMUX_SOURCE_VERSION}.tar.gz"
+        build_dir="$(mktemp -d)"
+        archive="$build_dir/tmux-3.4.tar.gz"
+        wget -q -O "$archive" https://github.com/tmux/tmux/releases/download/3.4/tmux-3.4.tar.gz
         if ! printf '%s  %s\n' "$TMUX_SOURCE_SHA256" "$archive" | sha256sum -c -; then
-            rm -rf "$build_root"
-            print_error "tmux source checksum verification failed"
+            rm -rf "$build_dir"
+            print_error "tmux source archive checksum verification failed"
             return 1
         fi
-        tar xzf "$archive" -C "$build_root"
+        tar xzf "$archive" -C "$build_dir"
         if ! (
-            cd "$build_root/tmux-${TMUX_SOURCE_VERSION}" &&
+            cd "$build_dir/tmux-3.4" &&
             ./configure &&
             make &&
             $USE_SUDO make install
         ); then
-            rm -rf "$build_root"
+            rm -rf "$build_dir"
             print_error "tmux source build failed"
             return 1
         fi
-        rm -rf "$build_root"
-        print_success "tmux $TMUX_SOURCE_VERSION installed from source"
+        rm -rf "$build_dir"
+        print_success "tmux 3.4 installed from source"
     }
 
     if command_exists tmux; then
@@ -446,7 +370,7 @@ install_core_tools() {
 
         if [ "$TMUX_MAJOR" -lt 3 ] || ([ "$TMUX_MAJOR" -eq 3 ] && [ "$TMUX_MINOR" -lt 3 ]); then
             print_warning "tmux $TMUX_VERSION is installed, but 3.3+ is required for OSC 52 clipboard"
-            if ask_reconfigure "Replace the existing tmux command with a 3.4 source build?"; then
+            if ask_yes_no "Build tmux 3.4 from source?"; then
                 install_tmux_from_source
             else
                 print_warning "Keeping tmux $TMUX_VERSION - clipboard integration may not work"
@@ -488,12 +412,8 @@ install_core_tools() {
                 # Use NodeSource for newer version
                 local node_setup
                 node_setup="$(mktemp)"
-                if ! curl -fsSL https://deb.nodesource.com/setup_lts.x -o "$node_setup"; then
-                    rm -f "$node_setup"
-                    print_error "Failed to download the NodeSource setup script"
-                    return 1
-                fi
-                if ! $USE_SUDO bash "$node_setup"; then
+                if ! curl -fsSL https://deb.nodesource.com/setup_lts.x -o "$node_setup" ||
+                   ! $USE_SUDO bash "$node_setup"; then
                     rm -f "$node_setup"
                     print_error "NodeSource setup failed"
                     return 1
@@ -511,26 +431,22 @@ install_core_tools() {
         print_success "Node.js already installed: $(node --version)"
     fi
 
-    # npm and npx are required by Codex and the mdview helpers. Some distro
+    # npm/npx are required by Codex and the Markdown reviewer. Some distro
     # Node packages do not include them.
-    if ! command_exists npm || ! command_exists npx; then
-        if ask_yes_no "Install npm/npx? (required for Codex and mdview)"; then
-            print_info "Installing npm..."
+    if command_exists node; then
+        if ! command_exists npm || ! command_exists npx; then
+            print_info "Installing npm/npx..."
             $INSTALL_CMD npm
-        else
-            print_warning "Skipping npm/npx; Codex and mdview installation may be unavailable"
         fi
-    fi
 
-    if command_exists npm; then
-        print_success "npm available: $(npm --version)"
+        if command_exists npm && command_exists npx; then
+            print_success "npm/npx available: npm $(npm --version), npx $(npx --version)"
+        else
+            print_error "npm/npx are required but unavailable"
+            return 1
+        fi
     else
-        print_warning "npm is unavailable"
-    fi
-    if command_exists npx; then
-        print_success "npx available: $(npx --version)"
-    else
-        print_warning "npx is unavailable"
+        print_warning "Node.js was skipped; Codex and Markdown preview setup will also be skipped"
     fi
 }
 
@@ -546,77 +462,61 @@ setup_fish_shell() {
         return
     fi
 
-    # Get fish path
-    FISH_PATH=$(command -v fish)
-    print_info "Fish located at: $FISH_PATH"
+    local fish_path
+    local current_login_shell
+    local user_name
+    local bashrc_marker="# cmux-phase-a: enter Fish from interactive Bash"
+
+    fish_path="$(command -v fish)"
+    user_name="$(id -un)"
+    current_login_shell="$(getent passwd "$user_name" 2>/dev/null | awk -F: '{print $7}')"
+
+    print_info "Fish located at: $fish_path"
 
     # Add fish to allowed shells if not already there
-    if [ -f /etc/shells ] && ! grep -Fxq "$FISH_PATH" /etc/shells; then
+    if [ -f /etc/shells ] && ! grep -Fxq "$fish_path" /etc/shells; then
         print_info "Adding fish to /etc/shells..."
-        echo "$FISH_PATH" | $USE_SUDO tee -a /etc/shells > /dev/null
+        echo "$fish_path" | $USE_SUDO tee -a /etc/shells > /dev/null
         print_success "Fish added to allowed shells"
     else
         print_success "Fish already in allowed shells"
     fi
 
-    local login_shell
-    local tmux_default_shell
-    local configure_default=false
-
-    login_shell="$(getent passwd "$(id -un)" 2>/dev/null | awk -F: '{print $7}')"
-    tmux_default_shell="$(tmux show-options -gv default-shell 2>/dev/null || true)"
-
-    if [ "$login_shell" = "$FISH_PATH" ]; then
-        print_success "Fish is already the login shell"
-        return
-    fi
-
-    # An established tmux workflow that already launches Fish is authoritative.
-    # Do not change its login shell during a safe rerun.
-    if [ "$FORCE" != true ] && {
-        [ "$tmux_default_shell" = "$FISH_PATH" ] ||
-        grep -Eq 'default-shell[[:space:]].*fish' "$HOME/.tmux.conf" 2>/dev/null
-    }; then
-        print_success "Existing tmux workflow already uses Fish; preserving login shell"
-        return
-    fi
-
-    if [ "$FORCE" = true ]; then
-        configure_default=true
-    elif [ "$AUTO_YES" = true ]; then
-        # On a fresh RunPod image Fish may already be installed. The absence
-        # of an established Fish/tmux workflow above means it still needs to
-        # become the default shell.
-        configure_default=true
-    elif ask_yes_no "Set Fish as your default shell?"; then
-        configure_default=true
-    fi
-
-    # Try chsh first, fall back to .bashrc if it fails.
-    if [ "$configure_default" = true ]; then
-        print_info "Trying chsh to set default shell..."
-        if command_exists chsh && $USE_SUDO chsh -s "$FISH_PATH" "$(id -un)" 2>/dev/null; then
-            print_success "Default shell set to Fish via chsh"
-            print_info "Reconnect, or run 'exec fish' in the current shell before starting tmux"
+    # Configure both the account login shell and a guarded Bash handoff. Some
+    # container SSH entrypoints ignore /etc/passwd and explicitly launch Bash;
+    # the handoff makes those interactive sessions enter Fish as well.
+    if ask_yes_no "Set Fish as your default shell?"; then
+        if [ "$current_login_shell" = "$fish_path" ]; then
+            print_success "Fish is already the account login shell"
+        elif command_exists chsh && $USE_SUDO chsh -s "$fish_path" "$user_name" 2>/dev/null; then
+            print_success "Account login shell set to Fish"
         else
-            # chsh failed, fall back to .bashrc method
-            print_warning "chsh failed, falling back to .bashrc auto-start method"
-            if ! grep -q "exec fish" ~/.bashrc 2>/dev/null; then
-                print_info "Adding Fish auto-start to .bashrc..."
-                cat >> ~/.bashrc << 'EOF'
+            print_warning "Could not change the account login shell; using the Bash handoff"
+        fi
 
-# Auto-start fish shell (added by setup script)
-if command -v fish &> /dev/null && [ -z "$FISH_VERSION" ]; then
-    exec fish
+        if ! grep -Fq "$bashrc_marker" "$HOME/.bashrc" 2>/dev/null; then
+            print_info "Adding guarded interactive-Bash to Fish handoff..."
+            cat >> "$HOME/.bashrc" << 'EOF'
+
+# cmux-phase-a: enter Fish from interactive Bash
+if [[ $- == *i* ]] && command -v fish >/dev/null 2>&1 && [ -z "${FISH_VERSION:-}" ]; then
+    _cmux_parent_shell="$(ps -p "$PPID" -o comm= 2>/dev/null | tr -d '[:space:]')"
+    if [ "$_cmux_parent_shell" != "fish" ]; then
+        unset _cmux_parent_shell
+        exec fish
+    fi
+    unset _cmux_parent_shell
 fi
 EOF
-                print_success "Fish will auto-start on login via .bashrc"
-            else
-                print_success "Fish auto-start already configured in .bashrc"
-            fi
+            print_success "Interactive Bash sessions will hand off to Fish"
+        else
+            print_success "Interactive Bash-to-Fish handoff already configured"
         fi
+
+        print_warning "The current parent shell cannot be replaced by a child setup script"
+        print_info "Run 'exec fish' now, or reconnect through cmux before starting tmux"
     else
-        print_warning "Fish login-shell behavior left unchanged. Run 'exec fish' when needed"
+        print_warning "Fish won't be default. Run 'fish' manually or 'exec fish'"
     fi
 }
 
@@ -632,144 +532,79 @@ setup_fish_config_and_plugins() {
         return
     fi
 
-    local fish_dir="$HOME/.config/fish"
-    local fish_config="$fish_dir/config.fish"
-    local fish_plugins="$fish_dir/fish_plugins"
-    local config_changed=false
-    local plugins_preexisted=false
-    local plugins_changed=false
-    local tmp_file
+    # Create fish config directory
+    mkdir -p ~/.config/fish
 
-    mkdir -p "$fish_dir" "$fish_dir/conf.d" "$fish_dir/functions"
+    # Download fish config files from GitHub
+    local SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-    if [ -f "$fish_config" ]; then
-        if ask_reconfigure "Replace the existing Fish config.fish?"; then
-            tmp_file="$(mktemp)"
-            if stage_setup_file fish_config.fish "$tmp_file"; then
-                backup_file "$fish_config"
-                install -m 644 "$tmp_file" "$fish_config"
-                config_changed=true
-                print_success "Fish config.fish replaced"
-            else
-                print_warning "Could not stage Fish config; preserving the existing file"
-            fi
-            rm -f "$tmp_file"
-        else
-            print_success "Existing Fish config.fish preserved"
-        fi
+    # Extract repo path from SSH format (git@github.com:user/repo.git -> user/repo)
+    local REPO_PATH="${NVIM_CONFIG_REPO#git@github.com:}"
+    REPO_PATH="${REPO_PATH%.git}"
+
+    # Check if we're running from the cloned repo
+    if [ -f "$SCRIPT_DIR/fish_config.fish" ]; then
+        print_info "Copying fish config from local directory..."
+        cp "$SCRIPT_DIR/fish_config.fish" ~/.config/fish/config.fish
     else
-        tmp_file="$(mktemp)"
-        if stage_setup_file fish_config.fish "$tmp_file"; then
-            install -m 644 "$tmp_file" "$fish_config"
-            print_success "Fish config.fish installed"
-        else
-            print_warning "Failed to download Fish config; creating an empty base config"
-            install -m 644 /dev/null "$fish_config"
-        fi
-        rm -f "$tmp_file"
-        config_changed=true
+        # Download from GitHub if not running from repo
+        print_info "Downloading fish config from GitHub..."
+        curl -fsSL "https://raw.githubusercontent.com/${REPO_PATH}/${NVIM_CONFIG_BRANCH}/mac_dev_setup/fish_config.fish" -o ~/.config/fish/config.fish || {
+            print_warning "Failed to download fish config, creating basic config"
+            touch ~/.config/fish/config.fish
+        }
+    fi
+    print_success "Fish config.fish in place"
+
+    # Install Fisher (bootstrap) - this overwrites fish_plugins, so we download plugins list AFTER
+    print_info "Installing Fisher (Fish plugin manager)..."
+    fish -c "curl -sL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher" || true
+    print_success "Fisher installed"
+
+    # Now download fish_plugins AFTER Fisher is installed (Fisher overwrites this file)
+    if [ -f "$SCRIPT_DIR/fish_plugins" ]; then
+        print_info "Copying fish_plugins from local directory..."
+        cp "$SCRIPT_DIR/fish_plugins" ~/.config/fish/fish_plugins
+    else
+        print_info "Downloading fish_plugins from GitHub..."
+        curl -fsSL "https://raw.githubusercontent.com/${REPO_PATH}/${NVIM_CONFIG_BRANCH}/mac_dev_setup/fish_plugins" -o ~/.config/fish/fish_plugins || {
+            print_warning "Failed to download fish_plugins"
+        }
     fi
 
-    # Only alter config.fish when it was installed/replaced in this run.
-    if [ "$config_changed" = true ] &&
-       ! grep -q "PIP_BREAK_SYSTEM_PACKAGES" "$fish_config" 2>/dev/null; then
-        cat >> "$fish_config" << 'EOF'
+    # Install all plugins from fish_plugins
+    if [ -f ~/.config/fish/fish_plugins ]; then
+        print_info "Installing Fish plugins from fish_plugins..."
+        fish -c "fisher update" || true
+        print_success "Fish plugins installed: fzf.fish, z, npm-global, nvm.fish"
+    else
+        print_warning "fish_plugins not found, skipping plugin installation"
+    fi
+
+    # Add container-specific environment variables to fish config
+    if ! grep -q "PIP_BREAK_SYSTEM_PACKAGES" ~/.config/fish/config.fish 2>/dev/null; then
+        print_info "Adding container-specific env vars to fish config..."
+        cat >> ~/.config/fish/config.fish << 'EOF'
 
 # Allow pip to install system-wide in containers
 set -gx PIP_BREAK_SYSTEM_PACKAGES 1
 EOF
-        print_success "Container Python setting added to managed Fish config"
-    elif ! grep -q "PIP_BREAK_SYSTEM_PACKAGES" "$fish_config" 2>/dev/null; then
-        print_warning "Existing Fish config has no PIP_BREAK_SYSTEM_PACKAGES setting; preserving it"
-    fi
-
-    [ -f "$fish_plugins" ] && plugins_preexisted=true
-
-    # Fisher's bootstrap can rewrite fish_plugins. Preserve a pre-existing list
-    # byte-for-byte around the bootstrap and never update it in safe mode.
-    if [ ! -f "$fish_dir/functions/fisher.fish" ]; then
-        local saved_plugins=""
-        if [ "$plugins_preexisted" = true ]; then
-            saved_plugins="$(mktemp)"
-            cp -p -- "$fish_plugins" "$saved_plugins"
-        fi
-
-        print_info "Installing Fisher (Fish plugin manager)..."
-        if fish -c "curl -fsSL https://raw.githubusercontent.com/jorgebucaran/fisher/main/functions/fisher.fish | source && fisher install jorgebucaran/fisher"; then
-            print_success "Fisher installed"
-        else
-            print_warning "Fisher bootstrap failed"
-        fi
-
-        if [ -n "$saved_plugins" ]; then
-            cp -p -- "$saved_plugins" "$fish_plugins"
-            rm -f "$saved_plugins"
-        fi
+        print_success "Added PIP_BREAK_SYSTEM_PACKAGES to fish config"
     else
-        print_success "Fisher already installed"
-    fi
-
-    if [ "$plugins_preexisted" = true ]; then
-        if ask_reconfigure "Replace fish_plugins and update managed Fish plugins?"; then
-            plugins_changed=true
-        else
-            print_success "Existing fish_plugins and installed plugins preserved"
-        fi
-    else
-        plugins_changed=true
-    fi
-
-    if [ "$plugins_changed" = true ]; then
-        tmp_file="$(mktemp)"
-        if stage_setup_file fish_plugins "$tmp_file"; then
-            if [ "$plugins_preexisted" = true ]; then
-                backup_file "$fish_plugins"
-            fi
-            install -m 644 "$tmp_file" "$fish_plugins"
-            if [ -f "$fish_dir/functions/fisher.fish" ]; then
-                print_info "Installing declared Fish plugins..."
-                if fish -c "fisher update"; then
-                    print_success "Declared Fish plugins installed"
-                else
-                    print_warning "Some Fish plugins could not be installed"
-                fi
-            else
-                print_warning "fish_plugins installed, but Fisher is unavailable"
-            fi
-        else
-            print_warning "Failed to stage fish_plugins"
-        fi
-        rm -f "$tmp_file"
+        print_success "PIP_BREAK_SYSTEM_PACKAGES already in fish config"
     fi
 
     # cmux installs its remote CLI relay under ~/.cmux/bin on first `cmux ssh`.
-    # Keep the path configured even before the relay exists, but preserve an
-    # existing validated file during a safe rerun.
-    local cmux_fish="$fish_dir/conf.d/99-cmux.fish"
-    local write_cmux_fish=false
-
-    if [ -e "$cmux_fish" ]; then
-        if ask_reconfigure "Replace the existing 99-cmux.fish?"; then
-            backup_file "$cmux_fish"
-            write_cmux_fish=true
-        else
-            print_success "Existing cmux Fish PATH configuration preserved"
-        fi
-    else
-        write_cmux_fish=true
-    fi
-
-    if [ "$write_cmux_fish" = true ]; then
-        tmp_file="$(mktemp)"
-        cat > "$tmp_file" << 'EOF'
+    # Keep the path configured even before the relay exists.
+    mkdir -p ~/.config/fish/conf.d
+    if [ ! -e ~/.config/fish/conf.d/99-cmux.fish ]; then
+        cat > ~/.config/fish/conf.d/99-cmux.fish << 'EOF'
 # cmux remote CLI relay (installed automatically by `cmux ssh`)
 fish_add_path $HOME/.cmux/bin
 EOF
-        install -m 644 "$tmp_file" "$cmux_fish"
-        rm -f "$tmp_file"
-        print_success "cmux remote CLI path configured for new Fish shells"
-    elif ! grep -Eq 'fish_add_path.*\.cmux/bin' "$cmux_fish" 2>/dev/null; then
-        print_warning "Existing 99-cmux.fish does not visibly add ~/.cmux/bin; use -f to replace it"
+        print_success "cmux remote CLI path configured for Fish"
+    else
+        print_success "Existing cmux Fish PATH configuration preserved"
     fi
 }
 
@@ -780,36 +615,40 @@ EOF
 setup_tmux() {
     print_step "Step 6: Configuring tmux with OSC 52 Support"
 
-    local tmux_config="$HOME/.tmux.conf"
-    local replace_tmux=false
-    local tmp_file
+    # Backup existing tmux.conf
+    if [ -f ~/.tmux.conf ]; then
+        print_warning "Backing up existing ~/.tmux.conf to ~/.tmux.conf.backup"
+        cp ~/.tmux.conf ~/.tmux.conf.backup.$(date +%Y%m%d_%H%M%S)
+    fi
 
-    if [ -f "$tmux_config" ]; then
-        if ask_reconfigure "Replace the existing ~/.tmux.conf?"; then
-            replace_tmux=true
-        else
-            print_success "Existing ~/.tmux.conf preserved"
-        fi
+    # Download tmux configuration from GitHub
+    local SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+    # Extract repo path from SSH format (git@github.com:user/repo.git -> user/repo)
+    local REPO_PATH="${NVIM_CONFIG_REPO#git@github.com:}"
+    REPO_PATH="${REPO_PATH%.git}"
+
+    # Check if we're running from the cloned repo
+    if [ -f "$SCRIPT_DIR/tmux.conf" ]; then
+        print_info "Copying tmux config from local directory..."
+        cp "$SCRIPT_DIR/tmux.conf" ~/.tmux.conf
     else
-        replace_tmux=true
+        # Download from GitHub if not running from repo
+        print_info "Downloading tmux config from GitHub..."
+        curl -fsSL "https://raw.githubusercontent.com/${REPO_PATH}/${NVIM_CONFIG_BRANCH}/mac_dev_setup/tmux.conf" -o ~/.tmux.conf || {
+            print_error "Failed to download tmux config"
+            return 1
+        }
     fi
+    print_success "tmux configuration installed at ~/.tmux.conf"
 
-    if [ "$replace_tmux" = true ]; then
-        tmp_file="$(mktemp)"
-        if stage_setup_file tmux.conf "$tmp_file"; then
-            if [ -f "$tmux_config" ]; then
-                backup_file "$tmux_config"
-            fi
-            install -m 644 "$tmp_file" "$tmux_config"
-            print_success "tmux configuration installed at ~/.tmux.conf"
-        else
-            print_error "Failed to stage tmux configuration; existing state was not changed"
-        fi
-        rm -f "$tmp_file"
+    # Make new tmux panes deterministic even if the outer container shell or
+    # SSH entrypoint supplied an outdated SHELL value.
+    if command_exists fish && ! grep -Eq '^(set|set-option)[[:space:]]+-g[[:space:]]+default-shell[[:space:]]' ~/.tmux.conf 2>/dev/null; then
+        printf '\n# Use Fish for new tmux panes (added by container setup)\n' >> ~/.tmux.conf
+        printf 'set-option -g default-shell "%s"\n' "$(command -v fish)" >> ~/.tmux.conf
+        print_success "tmux default shell set to Fish for new servers/panes"
     fi
-
-    # Deliberately do not source-file the config or mutate a running tmux
-    # server. Existing sessions remain the persistence authority.
 
     # Install TPM (Tmux Plugin Manager)
     if [ ! -d ~/.tmux/plugins/tpm ]; then
@@ -832,8 +671,7 @@ install_neovim() {
     if command_exists nvim; then
         CURRENT_VERSION=$(nvim --version | head -n1)
         print_success "Neovim already installed: $CURRENT_VERSION"
-        if ! ask_reconfigure "Replace the existing Neovim with $NEOVIM_VERSION?"; then
-            print_success "Existing Neovim preserved"
+        if ! ask_yes_no "Reinstall Neovim $NEOVIM_VERSION?"; then
             return
         fi
     fi
@@ -843,9 +681,8 @@ install_neovim() {
     if [ "$ARCH" = "x86_64" ]; then
         NVIM_ARCH="linux64"
     elif [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-        print_warning "Neovim $NEOVIM_VERSION has no equivalent official linux64 ARM archive"
-        print_warning "Preserving the system; install an ARM build through the platform package manager"
-        return
+        print_error "Neovim $NEOVIM_VERSION does not provide this x86_64 archive for $ARCH"
+        return 1
     else
         print_error "Unsupported architecture: $ARCH"
         return
@@ -855,9 +692,6 @@ install_neovim() {
     local tmp_dir
     local archive
     local extracted
-    local install_dir="/usr/local/nvim-${NEOVIM_VERSION}"
-    local staged_dir="/usr/local/.nvim-${NEOVIM_VERSION}.new.$$"
-    local old_dir=""
 
     tmp_dir="$(mktemp -d)"
     archive="$tmp_dir/nvim-${NVIM_ARCH}.tar.gz"
@@ -875,15 +709,11 @@ install_neovim() {
     tar xzf "$archive" -C "$tmp_dir"
 
     print_info "Installing Neovim to /usr/local..."
-    $USE_SUDO rm -rf "$staged_dir"
-    $USE_SUDO mv "$extracted" "$staged_dir"
-    if [ -e "$install_dir" ]; then
-        old_dir="${install_dir}.backup.$(date +%Y%m%d_%H%M%S).$$"
-        $USE_SUDO mv "$install_dir" "$old_dir"
-        print_warning "Previous Neovim directory preserved at $old_dir"
-    fi
-    $USE_SUDO mv "$staged_dir" "$install_dir"
-    $USE_SUDO ln -sfn "$install_dir/bin/nvim" /usr/local/bin/nvim
+    $USE_SUDO mkdir -p /usr/local/nvim-${NEOVIM_VERSION}
+    $USE_SUDO cp -a "$extracted"/. /usr/local/nvim-${NEOVIM_VERSION}/
+    $USE_SUDO ln -sf "/usr/local/nvim-${NEOVIM_VERSION}/bin/nvim" /usr/local/bin/nvim
+
+    # Cleanup
     rm -rf "$tmp_dir"
 
     print_success "Neovim $NEOVIM_VERSION installed: $(nvim --version | head -n1)"
@@ -897,118 +727,103 @@ setup_neovim_config() {
     print_step "Step 8: Setting up Neovim Configuration"
 
     local config_dir="$HOME/.config/nvim"
+    local repo_path="${NVIM_CONFIG_REPO#git@github.com:}"
+    local https_repo
 
-    # This script is commonly committed inside the Neovim config repository.
-    # Never delete the checkout that contains the currently executing script.
+    repo_path="${repo_path%.git}"
+    https_repo="https://github.com/${repo_path}.git"
+
+    # The setup script is intended to be committed inside this repository.
+    # Never delete the checkout containing the script currently being read.
     case "$SETUP_SCRIPT_DIR/" in
         "$config_dir/"*)
             print_success "Running from the Neovim config checkout; preserving it"
-            if [ "$FORCE" = true ]; then
-                print_warning "Neovim config replacement skipped: copy this script outside ~/.config/nvim before using -f"
-            fi
-            return
+            return 0
             ;;
     esac
 
-    # Clean up existing nvim configs only after explicit replacement consent.
+    # Clean up existing nvim configs if requested
     if [ -d "$config_dir" ] || [ -d ~/.local/share/nvim ] || [ -d ~/.cache/nvim ]; then
         print_warning "Existing Neovim configuration detected"
-        if ask_reconfigure "Remove existing Neovim config/data/cache and start fresh?"; then
+        if ask_yes_no "Remove existing Neovim configs and start fresh?"; then
             print_info "Removing existing Neovim data..."
             rm -rf ~/.local/share/nvim
             rm -rf ~/.cache/nvim
             rm -rf ~/.config/nvim
             print_success "Existing configs removed"
-        elif [ -d "$config_dir" ]; then
-            print_success "Existing Neovim config/data/cache preserved"
-            return
-        else
-            print_warning "Existing Neovim data/cache preserved; adding only the missing config checkout"
         fi
     fi
 
     # Clone nvim config repository
     if [ ! -d "$config_dir" ]; then
-        local repo_path="${NVIM_CONFIG_REPO#git@github.com:}"
-        local https_repo
-        repo_path="${repo_path%.git}"
-        https_repo="https://github.com/${repo_path}.git"
-
         print_info "Cloning Neovim config branch $NVIM_CONFIG_BRANCH..."
-        if ! git clone --branch "$NVIM_CONFIG_BRANCH" --single-branch \
-            "$https_repo" "$config_dir"; then
+        if ! git clone --branch "$NVIM_CONFIG_BRANCH" --single-branch "$https_repo" "$config_dir"; then
             rm -rf "$config_dir"
-            print_warning "HTTPS clone failed; trying the configured repository URL"
-            git clone --branch "$NVIM_CONFIG_BRANCH" --single-branch \
-                "$NVIM_CONFIG_REPO" "$config_dir"
+            print_warning "HTTPS clone failed; retrying with $NVIM_CONFIG_REPO"
+            git clone --branch "$NVIM_CONFIG_BRANCH" --single-branch "$NVIM_CONFIG_REPO" "$config_dir"
         fi
         print_success "Neovim config cloned (branch: $NVIM_CONFIG_BRANCH)"
     else
         print_success "~/.config/nvim already exists"
+        if [ -d "$config_dir/.git" ]; then
+            print_info "Current branch: $(git -C "$config_dir" branch --show-current)"
+        fi
     fi
 
-    print_warning "First launch of Neovim will install plugins automatically"
-    print_info "This may take a few minutes..."
 }
 
-count_missing_locked_neovim_plugins() {
-    local lock_file="$HOME/.config/nvim/lazy-lock.json"
-    local lazy_root="$HOME/.local/share/nvim/lazy"
-    local plugin
-    local count=0
-
-    while IFS= read -r plugin; do
-        if [ ! -d "$lazy_root/$plugin" ]; then
-            count=$((count + 1))
-        fi
-    done < <(jq -r 'keys[]' "$lock_file")
-
-    printf '%s\n' "$count"
-}
-
-install_missing_neovim_plugins() {
-    print_step "Step 8b: Installing Missing Neovim Plugins"
+install_neovim_plugins() {
+    print_step "Step 8b: Installing Neovim Plugins"
 
     local config_dir="$HOME/.config/nvim"
     local lock_file="$config_dir/lazy-lock.json"
-    local missing_count
+    local lazy_root="$HOME/.local/share/nvim/lazy"
+    local missing_count=0
+    local plugin
     local verify_command
 
     if ! command_exists nvim; then
-        print_warning "Neovim is unavailable; skipping plugin installation"
-        return 0
+        print_error "Neovim is unavailable; cannot install plugins"
+        return 1
     fi
 
-    # Do not run Lazy commands against an unrelated pre-existing Neovim config.
     if [ ! -f "$config_dir/lua/insis/lazy.lua" ]; then
-        print_warning "Existing Neovim config is not the managed InsisVim layout; preserving it"
+        print_warning "InsisVim Lazy configuration not found; skipping managed plugin bootstrap"
         return 0
     fi
 
     if ! jq -e 'type == "object"' "$lock_file" >/dev/null 2>&1; then
-        print_error "Missing or invalid Neovim plugin lock file: $lock_file"
+        print_error "Missing or invalid plugin lock file: $lock_file"
         return 1
     fi
 
-    missing_count="$(count_missing_locked_neovim_plugins)"
+    while IFS= read -r plugin; do
+        [ -d "$lazy_root/$plugin" ] || missing_count=$((missing_count + 1))
+    done < <(jq -r 'keys[]' "$lock_file")
+
     if [ "$missing_count" -eq 0 ]; then
-        print_success "All lockfile-pinned Neovim plugins are already present"
+        print_success "All lockfile plugin directories are already present"
         return 0
     fi
 
-    print_info "Installing missing enabled Neovim plugins at lockfile-pinned revisions..."
-    verify_command='lua local missing = {}; for name, plugin in pairs(require("lazy.core.config").plugins) do if plugin.url and not plugin._.installed then missing[#missing + 1] = name end end; if #missing > 0 then vim.api.nvim_err_writeln("Missing Lazy plugins: " .. table.concat(missing, ", ")); vim.cmd("cquit 1") end'
+    print_info "First-run bootstrap: installing missing plugins (this can take several minutes)..."
+    verify_command='lua local missing = {}; for name, plugin_spec in pairs(require("lazy.core.config").plugins) do if plugin_spec.url and not plugin_spec._.installed then missing[#missing + 1] = name end end; if #missing > 0 then vim.api.nvim_err_writeln("Missing Lazy plugins: " .. table.concat(missing, ", ")); vim.cmd("cquit 1") end'
 
     if ! GIT_TERMINAL_PROMPT=0 nvim --headless \
         "+Lazy! install" \
         "+$verify_command" \
         +qa; then
-        print_error "Headless Neovim plugin installation failed"
-        print_info "Retry manually with: nvim --headless '+Lazy! install' +qa"
+        print_error "Neovim plugin bootstrap failed"
+        print_info "Retry with: nvim --headless '+Lazy! install' +qa"
         return 1
     fi
 
-    print_success "All enabled lockfile-pinned Neovim plugins are installed"
+    if [ ! -d "$lazy_root/lazy.nvim" ]; then
+        print_error "lazy.nvim was not installed"
+        return 1
+    fi
+
+    print_success "All enabled Neovim plugins are installed"
 }
 
 #######################################
@@ -1059,20 +874,14 @@ setup_claude_settings() {
 install_additional_tools() {
     print_step "Step 9: Installing Additional LSPs/Formatters (Optional)"
 
-    if command_exists pylsp && command_exists black; then
-        print_success "Python LSP and black already available"
-    elif ! ask_yes_no "Install missing Python LSP/formatter tools?"; then
+    if ! ask_yes_no "Install Python LSP and formatter (python-lsp-server, black)?"; then
         print_warning "Skipping Python tools"
     else
-        local python_packages=()
-        command_exists pylsp || python_packages+=(python-lsp-server)
-        command_exists black || python_packages+=(black)
-
         if command_exists pip3; then
-            pip3 install --user "${python_packages[@]}" 2>/dev/null || pip3 install "${python_packages[@]}"
+            pip3 install --user python-lsp-server black 2>/dev/null || pip3 install python-lsp-server black
             print_success "Python LSP and black installed"
         elif command_exists pip; then
-            pip install --user "${python_packages[@]}" 2>/dev/null || pip install "${python_packages[@]}"
+            pip install --user python-lsp-server black 2>/dev/null || pip install python-lsp-server black
             print_success "Python LSP and black installed"
         else
             print_warning "pip not found, skipping Python tools"
@@ -1085,12 +894,8 @@ install_additional_tools() {
             print_info "Installing Claude Code..."
             local claude_installer
             claude_installer="$(mktemp)"
-            if ! curl -fsSL https://claude.ai/install.sh -o "$claude_installer"; then
-                rm -f "$claude_installer"
-                print_error "Failed to download the Claude Code installer"
-                return 1
-            fi
-            if ! bash "$claude_installer"; then
+            if ! curl -fsSL https://claude.ai/install.sh -o "$claude_installer" ||
+               ! bash "$claude_installer"; then
                 rm -f "$claude_installer"
                 print_error "Claude Code installer failed"
                 return 1
@@ -1120,7 +925,8 @@ install_additional_tools() {
         if ask_yes_no "Install OpenAI Codex CLI?"; then
             if command_exists npm; then
                 print_info "Installing Codex CLI..."
-                npm install -g @openai/codex
+                npm install -g --prefix "$HOME/.node_modules" @openai/codex
+                export PATH="$HOME/.node_modules/bin:$PATH"
                 print_success "Codex CLI installed"
             else
                 print_warning "npm not found, skipping Codex CLI installation"
@@ -1153,9 +959,8 @@ setup_cmux_claude_notifications() {
 
     mkdir -p "$hook_dir"
 
-    if should_install_managed_file "$hook_script" "Claude cmux notifier"; then
-        tmp_file="$(mktemp)"
-        cat > "$tmp_file" << 'EOF'
+    if [ ! -e "$hook_script" ]; then
+        cat > "$hook_script" << 'EOF'
 #!/usr/bin/env bash
 
 CMUX="$HOME/.cmux/bin/cmux"
@@ -1188,19 +993,19 @@ esac
 
 exit 0
 EOF
-        install -m 700 "$tmp_file" "$hook_script"
-        rm -f "$tmp_file"
+        chmod 700 "$hook_script"
         print_success "Claude cmux notifier installed"
-    elif [ ! -x "$hook_script" ]; then
-        print_warning "Existing Claude cmux notifier is not executable; use -f to replace it"
+    else
+        print_success "Existing Claude cmux notifier preserved"
+        if [ ! -x "$hook_script" ]; then
+            print_warning "Existing Claude cmux notifier is not executable: $hook_script"
+        fi
     fi
 
     mkdir -p "$HOME/.claude"
     if [ ! -f "$settings" ]; then
-        tmp_file="$(mktemp)"
-        printf '{}\n' > "$tmp_file"
-        install -m 600 "$tmp_file" "$settings"
-        rm -f "$tmp_file"
+        printf '{}\n' > "$settings"
+        chmod 600 "$settings"
     fi
 
     if ! jq empty "$settings" >/dev/null 2>&1; then
@@ -1223,7 +1028,7 @@ EOF
            end)
     ' "$settings" > "$tmp_file"; then
         if ! cmp -s "$settings" "$tmp_file"; then
-            backup_file "$settings"
+            cp "$settings" "$settings.backup.$(date +%Y%m%d_%H%M%S)"
             install -m 600 "$tmp_file" "$settings"
             print_success "Claude Code cmux notification hooks installed"
         else
@@ -1250,9 +1055,8 @@ setup_cmux_codex_notifications() {
 
     mkdir -p "$codex_dir"
 
-    if should_install_managed_file "$notify_script" "Codex cmux notifier"; then
-        tmp_file="$(mktemp)"
-        cat > "$tmp_file" << 'EOF'
+    if [ ! -e "$notify_script" ]; then
+        cat > "$notify_script" << 'EOF'
 #!/usr/bin/env bash
 
 CMUX="$HOME/.cmux/bin/cmux"
@@ -1281,11 +1085,13 @@ MESSAGE="${MESSAGE:0:240}"
 
 exit 0
 EOF
-        install -m 700 "$tmp_file" "$notify_script"
-        rm -f "$tmp_file"
+        chmod 700 "$notify_script"
         print_success "Codex cmux notifier installed"
-    elif [ ! -x "$notify_script" ]; then
-        print_warning "Existing Codex cmux notifier is not executable; use -f to replace it"
+    else
+        print_success "Existing Codex cmux notifier preserved"
+        if [ ! -x "$notify_script" ]; then
+            print_warning "Existing Codex cmux notifier is not executable: $notify_script"
+        fi
     fi
 
     notify_line="notify = [\"$notify_script\"]"
@@ -1310,7 +1116,7 @@ EOF
             printf '%s\n\n' "$notify_line"
             cat "$config"
         } > "$tmp_file"
-        backup_file "$config"
+        cp "$config" "$config.backup.$(date +%Y%m%d_%H%M%S)"
         install -m 600 "$tmp_file" "$config"
         rm -f "$tmp_file"
         print_success "Codex cmux notification added as a top-level notify command"
@@ -1346,111 +1152,48 @@ setup_cmux_phase_a_integration() {
 # Step 11: Install Markdown + TeX Review Helpers
 #######################################
 
-install_mdview_loopback_guard() {
-    local guard="$HOME/.local/share/mdview/force-loopback.cjs"
-    local tmp_file
-
-    mkdir -p "$(dirname "$guard")"
-
-    if [ -f "$guard" ] &&
-       grep -q 'CMUX_PHASE_A_MDVIEW_LOOPBACK_GUARD=1' "$guard" &&
-       [ "$FORCE" != true ]; then
-        print_success "Existing mdview loopback guard preserved"
-        return 0
-    fi
-
-    if ! should_install_managed_file "$guard" "mdview loopback guard"; then
-        print_warning "Cannot safely install mdview without a verified loopback guard"
-        return 1
-    fi
-
-    tmp_file="$(mktemp)"
-    cat > "$tmp_file" << 'EOF'
-// CMUX_PHASE_A_MDVIEW_LOOPBACK_GUARD=1
-// @hypersoweak/mdprev 0.1.1 has no host option and otherwise listens on all
-// interfaces. Constrain TCP servers in this one process tree to IPv4 loopback.
-const net = require("node:net");
-const originalListen = net.Server.prototype.listen;
-
-net.Server.prototype.listen = function (...args) {
-  if (typeof args[0] === "number") {
-    if (typeof args[1] === "string") {
-      args[1] = "127.0.0.1";
-    } else {
-      args.splice(1, 0, "127.0.0.1");
-    }
-  } else if (
-    args[0] &&
-    typeof args[0] === "object" &&
-    !Object.prototype.hasOwnProperty.call(args[0], "path")
-  ) {
-    args[0] = { ...args[0], host: "127.0.0.1" };
-  }
-  return originalListen.apply(this, args);
-};
-EOF
-    install -m 644 "$tmp_file" "$guard"
-    rm -f "$tmp_file"
-    print_success "mdview loopback guard installed"
-}
-
 setup_mdview_helpers() {
     print_step "Step 11: Installing Markdown + TeX Review Helpers"
 
-    local missing=()
     local functions_dir="$HOME/.config/fish/functions"
-    local target
-    local tmp_file
-    local node_major
-    local npm_major
-    local fish_major
-    local fish_minor
+    local missing=()
+    local cmd
 
     for cmd in fish node npm npx ss ps realpath nohup; do
         command_exists "$cmd" || missing+=("$cmd")
     done
 
     if [ "${#missing[@]}" -gt 0 ]; then
-        print_warning "Cannot install usable mdview helpers; missing: ${missing[*]}"
-        return 0
-    fi
-
-    node_major="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
-    npm_major="$(npm --version 2>/dev/null | cut -d. -f1)"
-    fish_major="$(fish --version 2>/dev/null | awk '{print $3}' | cut -d. -f1)"
-    fish_minor="$(fish --version 2>/dev/null | awk '{print $3}' | cut -d. -f2)"
-
-    if ! [[ "$node_major" =~ ^[0-9]+$ ]] || [ "$node_major" -lt 18 ]; then
-        print_warning "mdview requires Node.js 18+; preserving the existing Node installation"
-        return 0
-    fi
-    if ! [[ "$npm_major" =~ ^[0-9]+$ ]] || [ "$npm_major" -lt 7 ]; then
-        print_warning "mdview requires npm/npx 7+ for non-interactive pinned execution"
-        return 0
-    fi
-    if ! [[ "$fish_major" =~ ^[0-9]+$ ]] ||
-       ! [[ "$fish_minor" =~ ^[0-9]+$ ]] ||
-       [ "$fish_major" -lt 3 ] ||
-       { [ "$fish_major" -eq 3 ] && [ "$fish_minor" -lt 1 ]; }; then
-        print_warning "mdview helpers require Fish 3.1+; preserving the existing Fish installation"
+        print_warning "mdview helpers not installed; missing commands: ${missing[*]}"
         return 0
     fi
 
     mkdir -p "$functions_dir"
 
-    target="$functions_dir/mdview.fish"
-    if should_install_managed_file "$target" "mdview Fish helper"; then
-        if install_mdview_loopback_guard; then
-            tmp_file="$(mktemp)"
-            cat > "$tmp_file" << 'EOF'
+    if [ ! -e "$functions_dir/mdview.fish" ]; then
+        cat > "$functions_dir/mdview.fish" << 'EOF'
 function __mdview_pid_is_expected --argument-names pid
     set -l process_args (ps -p "$pid" -o args= 2>/dev/null | string collect | string trim)
     string match -rq -- '(@hypersoweak/mdprev|/mdprev)(@0\.1\.1)?([[:space:]]|$)' "$process_args"
 end
 
-function __mdview_group_is_expected --argument-names pgid
-    set -l rows (ps -eo pgid=,args= 2>/dev/null)
-    string match -rq -- "^[[:space:]]*$pgid[[:space:]].*(@hypersoweak/mdprev|/mdprev)" $rows
+function __mdview_cleanup_launcher --argument-names launcher_pid
+    if not string match -rq -- '^[0-9]+$' "$launcher_pid"
+        return
+    end
+
+    set -l launcher_pgid (ps -p "$launcher_pid" -o pgid= 2>/dev/null | string trim)
+    set -l group_rows (ps -eo pgid=,args= 2>/dev/null)
+    set -l expected_group 0
+    if string match -rq -- "^[[:space:]]*$launcher_pid[[:space:]].*(@hypersoweak/mdprev|/mdprev)" $group_rows
+        set expected_group 1
+    end
+
+    if test "$launcher_pgid" = "$launcher_pid"; and test "$expected_group" -eq 1
+        command kill -TERM -- -$launcher_pid 2>/dev/null
+    else if command kill -0 "$launcher_pid" 2>/dev/null; and __mdview_pid_is_expected "$launcher_pid"
+        command kill "$launcher_pid" 2>/dev/null
+    end
 end
 
 function mdview --description "Start Markdown + TeX preview in background"
@@ -1482,13 +1225,6 @@ function mdview --description "Start Markdown + TeX preview in background"
     set -l pid_file "$state_dir/$port.pid"
     set -l launcher_file "$state_dir/$port.launcher.pid"
     set -l log_file "$state_dir/$port.log"
-    set -l loopback_guard "$HOME/.local/share/mdview/force-loopback.cjs"
-
-    if not test -r "$loopback_guard"
-        echo "mdview: loopback safety guard is missing: $loopback_guard"
-        return 1
-    end
-
     mkdir -p "$state_dir"
 
     set -l listener_line (ss -H -ltnp "sport = :$port" 2>/dev/null | head -n 1)
@@ -1505,83 +1241,30 @@ function mdview --description "Start Markdown + TeX preview in background"
 
     rm -f "$pid_file" "$launcher_file"
 
-    set -l forced_node_options "--require=$loopback_guard"
-    if set -q NODE_OPTIONS; and test -n "$NODE_OPTIONS"
-        set forced_node_options "$NODE_OPTIONS $forced_node_options"
-    end
-
-    command nohup env NODE_OPTIONS="$forced_node_options" \
-        npx --yes @hypersoweak/mdprev@0.1.1 "$file" \
+    command nohup npx --yes @hypersoweak/mdprev@0.1.1 "$file" \
         --no-open --port "$port" >"$log_file" 2>&1 &
 
     set -l launcher_pid $last_pid
-    set -l launcher_pgid (ps -p "$launcher_pid" -o pgid= 2>/dev/null | string trim)
-    if test -z "$launcher_pgid"; or test "$launcher_pgid" != "$launcher_pid"
-        echo "mdview: could not create an isolated launcher process group"
-        if command kill -0 "$launcher_pid" 2>/dev/null
-            command kill "$launcher_pid" 2>/dev/null
-        end
-        echo "Log: $log_file"
-        return 1
-    end
     printf '%s\n' "$launcher_pid" > "$launcher_file"
 
-    # Allow up to two minutes for a cold npx cache to download mdprev.
+    # A cold npx cache may need time to download the pinned package.
     set -l server_pid ""
-    set -l started 0
-    set -l failure_reason "timed out waiting for mdprev"
-
     for i in (seq 1 600)
         set listener_line (ss -H -ltnp "sport = :$port" 2>/dev/null | head -n 1)
         if test -n "$listener_line"
             set server_pid (string match -r -g -- 'pid=([0-9]+)' "$listener_line" | head -n 1)
-            if test -z "$server_pid"
-                set failure_reason "listener PID is not visible"
-                break
-            end
-
-            set -l server_pgid (ps -p "$server_pid" -o pgid= 2>/dev/null | string trim)
-            if test "$server_pgid" != "$launcher_pid"; or not __mdview_pid_is_expected "$server_pid"
-                set failure_reason "requested port was taken by another process"
-                set server_pid ""
-                break
-            end
-            if not string match -q -- "*127.0.0.1:$port*" "$listener_line"
-                set failure_reason "mdprev did not bind exclusively to IPv4 loopback"
-                set server_pid ""
-                break
-            end
-
-            set started 1
             break
         end
-
-        if not command kill -0 -- -$launcher_pid 2>/dev/null
-            set failure_reason "launcher exited before opening the requested port"
+        if not command kill -0 "$launcher_pid" 2>/dev/null; and not command kill -0 -- -$launcher_pid 2>/dev/null
             break
         end
         sleep 0.2
     end
 
-    if test "$started" -ne 1
-        echo "mdview: failed to start preview ($failure_reason)"
+    if test -z "$server_pid"; or not __mdview_pid_is_expected "$server_pid"
+        echo "mdview: failed to start the managed preview on port $port"
         echo "Log: $log_file"
-
-        if __mdview_group_is_expected "$launcher_pid"
-            command kill -TERM -- -$launcher_pid 2>/dev/null
-            for i in (seq 1 20)
-                if not command kill -0 -- -$launcher_pid 2>/dev/null
-                    break
-                end
-                sleep 0.1
-            end
-            if command kill -0 -- -$launcher_pid 2>/dev/null; and __mdview_group_is_expected "$launcher_pid"
-                command kill -KILL -- -$launcher_pid 2>/dev/null
-            end
-        else if command kill -0 "$launcher_pid" 2>/dev/null; and __mdview_pid_is_expected "$launcher_pid"
-            command kill "$launcher_pid" 2>/dev/null
-        end
-
+        __mdview_cleanup_launcher "$launcher_pid"
         rm -f "$pid_file" "$launcher_file"
         return 1
     end
@@ -1593,18 +1276,14 @@ function mdview --description "Start Markdown + TeX preview in background"
     echo "Log:      $log_file"
 end
 EOF
-            install -m 644 "$tmp_file" "$target"
-            rm -f "$tmp_file"
-            print_success "mdview Fish helper installed"
-        else
-            print_warning "mdview Fish helper was not changed"
-        fi
+        chmod 644 "$functions_dir/mdview.fish"
+        print_success "mdview Fish helper installed"
+    else
+        print_success "Existing mdview Fish helper preserved"
     fi
 
-    target="$functions_dir/mdview-status.fish"
-    if should_install_managed_file "$target" "mdview-status Fish helper"; then
-        tmp_file="$(mktemp)"
-        cat > "$tmp_file" << 'EOF'
+    if [ ! -e "$functions_dir/mdview-status.fish" ]; then
+        cat > "$functions_dir/mdview-status.fish" << 'EOF'
 function __mdview_status_pid_is_expected --argument-names pid
     set -l process_args (ps -p "$pid" -o args= 2>/dev/null | string collect | string trim)
     string match -rq -- '(@hypersoweak/mdprev|/mdprev)(@0\.1\.1)?([[:space:]]|$)' "$process_args"
@@ -1612,8 +1291,7 @@ end
 
 function mdview-status --description "List managed Markdown preview servers"
     set -l state_dir "$HOME/.cache/mdview"
-    set -l records 0
-    set -l active 0
+    set -l found 0
 
     if not test -d "$state_dir"
         echo "No mdview previews running."
@@ -1625,26 +1303,19 @@ function mdview-status --description "List managed Markdown preview servers"
         if string match -q '*.launcher.pid' "$pid_file"; or not test -f "$pid_file"
             continue
         end
-        set records (math "$records + 1")
 
         set -l port (basename "$pid_file" .pid)
         set -l pid (head -n 1 "$pid_file" 2>/dev/null | string trim)
         if not string match -rq -- '^[0-9]+$' "$port"; or not string match -rq -- '^[0-9]+$' "$pid"
-            set -l display_pid "$pid"
-            test -n "$display_pid"; or set display_pid INVALID
-            printf "%-8s %-10s %s\n" "$port" "$display_pid" "INVALID STATE"
+            printf "%-8s %-10s %s\n" "$port" "INVALID" "INVALID STATE"
             continue
         end
 
         if command kill -0 "$pid" 2>/dev/null
             set -l listener_line (ss -H -ltnp "sport = :$port" 2>/dev/null | head -n 1)
             if string match -q -- "*pid=$pid,*" "$listener_line"; and __mdview_status_pid_is_expected "$pid"
-                if string match -q -- "*127.0.0.1:$port*" "$listener_line"
-                    printf "%-8s %-10s %s\n" "$port" "$pid" "RUNNING"
-                else
-                    printf "%-8s %-10s %s\n" "$port" "$pid" "RUNNING, NON-LOOPBACK BIND"
-                end
-                set active (math "$active + 1")
+                printf "%-8s %-10s %s\n" "$port" "$pid" "RUNNING"
+                set found 1
             else
                 printf "%-8s %-10s %s\n" "$port" "$pid" "PROCESS ALIVE, NOT MATCHING LISTENER"
             end
@@ -1653,31 +1324,23 @@ function mdview-status --description "List managed Markdown preview servers"
         end
     end
 
-    if test "$records" -eq 0
-        echo "No managed mdview state files found."
-    else if test "$active" -eq 0
+    if test "$found" -eq 0
         echo
         echo "No active mdview listeners found."
     end
 end
 EOF
-        install -m 644 "$tmp_file" "$target"
-        rm -f "$tmp_file"
+        chmod 644 "$functions_dir/mdview-status.fish"
         print_success "mdview-status Fish helper installed"
+    else
+        print_success "Existing mdview-status Fish helper preserved"
     fi
 
-    target="$functions_dir/mdview-stop.fish"
-    if should_install_managed_file "$target" "mdview-stop Fish helper"; then
-        tmp_file="$(mktemp)"
-        cat > "$tmp_file" << 'EOF'
+    if [ ! -e "$functions_dir/mdview-stop.fish" ]; then
+        cat > "$functions_dir/mdview-stop.fish" << 'EOF'
 function __mdview_stop_pid_is_expected --argument-names pid
     set -l process_args (ps -p "$pid" -o args= 2>/dev/null | string collect | string trim)
     string match -rq -- '(@hypersoweak/mdprev|/mdprev)(@0\.1\.1)?([[:space:]]|$)' "$process_args"
-end
-
-function __mdview_stop_group_is_expected --argument-names pgid
-    set -l rows (ps -eo pgid=,args= 2>/dev/null)
-    string match -rq -- "^[[:space:]]*$pgid[[:space:]].*(@hypersoweak/mdprev|/mdprev)" $rows
 end
 
 function mdview-stop --description "Stop a managed Markdown preview"
@@ -1703,55 +1366,24 @@ function mdview-stop --description "Stop a managed Markdown preview"
     set -l pid_file "$state_dir/$port.pid"
     set -l launcher_file "$state_dir/$port.launcher.pid"
 
-    if not test -f "$pid_file"; and not test -f "$launcher_file"
+    if not test -f "$pid_file"
         echo "mdview-stop: no managed preview found on port $port"
         return 1
     end
 
-    set -l server_pid ""
-    set -l launcher_pid ""
-    test -f "$pid_file"; and set server_pid (head -n 1 "$pid_file" 2>/dev/null | string trim)
-    test -f "$launcher_file"; and set launcher_pid (head -n 1 "$launcher_file" 2>/dev/null | string trim)
-
-    set -l managed_server 0
-    set -l server_pgid ""
-    if test -n "$server_pid"
-        if not string match -rq -- '^[0-9]+$' "$server_pid"
-            echo "mdview-stop: stale invalid server PID state"
-            set server_pid ""
-        else if command kill -0 "$server_pid" 2>/dev/null
-            set -l listener_line (ss -H -ltnp "sport = :$port" 2>/dev/null | head -n 1)
-            if string match -q -- "*pid=$server_pid,*" "$listener_line"; and __mdview_stop_pid_is_expected "$server_pid"
-                set managed_server 1
-                set server_pgid (ps -p "$server_pid" -o pgid= 2>/dev/null | string trim)
-            else
-                echo "mdview-stop: refusing to kill PID $server_pid; it is not the managed mdprev listener"
-                return 1
-            end
-        end
+    set -l server_pid (head -n 1 "$pid_file" 2>/dev/null | string trim)
+    if not string match -rq -- '^[0-9]+$' "$server_pid"
+        echo "mdview-stop: invalid managed PID state"
+        return 1
     end
 
-    set -l kill_group 0
-    if string match -rq -- '^[0-9]+$' "$launcher_pid"; and \
-       command kill -0 -- -$launcher_pid 2>/dev/null; and \
-       __mdview_stop_group_is_expected "$launcher_pid"
-        if test "$managed_server" -eq 0; or test "$server_pgid" = "$launcher_pid"
-            set kill_group 1
+    if command kill -0 "$server_pid" 2>/dev/null
+        set -l listener_line (ss -H -ltnp "sport = :$port" 2>/dev/null | head -n 1)
+        if not string match -q -- "*pid=$server_pid,*" "$listener_line"; or not __mdview_stop_pid_is_expected "$server_pid"
+            echo "mdview-stop: refusing to kill PID $server_pid; it is not the managed mdprev listener"
+            return 1
         end
-    end
 
-    if test "$kill_group" -eq 1
-        command kill -TERM -- -$launcher_pid 2>/dev/null
-        for i in (seq 1 20)
-            if not command kill -0 -- -$launcher_pid 2>/dev/null
-                break
-            end
-            sleep 0.1
-        end
-        if command kill -0 -- -$launcher_pid 2>/dev/null; and __mdview_stop_group_is_expected "$launcher_pid"
-            command kill -KILL -- -$launcher_pid 2>/dev/null
-        end
-    else if test "$managed_server" -eq 1
         command kill -TERM "$server_pid" 2>/dev/null
         for i in (seq 1 20)
             if not command kill -0 "$server_pid" 2>/dev/null
@@ -1764,22 +1396,21 @@ function mdview-stop --description "Stop a managed Markdown preview"
         end
     end
 
-    if test "$kill_group" -eq 0; and string match -rq -- '^[0-9]+$' "$launcher_pid"; and \
-       command kill -0 "$launcher_pid" 2>/dev/null; and __mdview_stop_pid_is_expected "$launcher_pid"
-        command kill "$launcher_pid" 2>/dev/null
+    if test -f "$launcher_file"
+        set -l launcher_pid (head -n 1 "$launcher_file" 2>/dev/null | string trim)
+        if string match -rq -- '^[0-9]+$' "$launcher_pid"; and command kill -0 "$launcher_pid" 2>/dev/null; and __mdview_stop_pid_is_expected "$launcher_pid"
+            command kill "$launcher_pid" 2>/dev/null
+        end
     end
 
     rm -f "$pid_file" "$launcher_file"
-    if test "$managed_server" -eq 1; or test "$kill_group" -eq 1
-        echo "Stopped Markdown preview on port $port"
-    else
-        echo "Removed stale mdview state for port $port"
-    end
+    echo "Stopped Markdown preview on port $port"
 end
 EOF
-        install -m 644 "$tmp_file" "$target"
-        rm -f "$tmp_file"
+        chmod 644 "$functions_dir/mdview-stop.fish"
         print_success "mdview-stop Fish helper installed"
+    else
+        print_success "Existing mdview-stop Fish helper preserved"
     fi
 }
 
@@ -1794,9 +1425,6 @@ main() {
 
     if [ "$AUTO_YES" = true ]; then
         print_warning "Running in non-interactive mode (-y flag)"
-    fi
-    if [ "$FORCE" = true ]; then
-        print_warning "Replacement mode enabled (-f): selected managed configs may be backed up and replaced"
     fi
 
     if ! ask_yes_no "Continue with setup?"; then
@@ -1813,8 +1441,8 @@ main() {
     setup_tmux
     install_neovim
     setup_neovim_config
-    install_missing_neovim_plugins
     install_additional_tools
+    install_neovim_plugins
     setup_cmux_phase_a_integration
     setup_mdview_helpers
 
@@ -1825,18 +1453,18 @@ main() {
     echo ""
     print_info "Next steps:"
     echo "  1. From the Mac, connect with: cmux ssh <host> --name <project>"
-    echo "  2. Before entering tmux in this connection, run: exec fish (or reconnect)"
+    echo "  2. Run 'exec fish' in this existing connection, or reconnect to enter Fish automatically"
     echo "  3. From Fish, start/attach tmux: tmux new-session -A -s <session>"
     echo "  4. Install tmux plugins once: Press Ctrl+a then Shift+I"
     echo "  5. Start neovim / Claude Code / Codex inside tmux"
     echo "  6. In nvim, run: :checkhealth provider"
-    echo "  7. For Markdown + TeX: mdview <file.md> [port], then open http://localhost:<port> in cmux Browser"
     echo ""
     print_info "cmux Phase A checks (after connecting from cmux):"
     echo "  - command -v cmux should resolve to $HOME/.cmux/bin/cmux"
     echo "  - cmux ping should return { \"pong\": true }"
     echo "  - Claude Stop/Task and Codex turn-complete notifications should appear in cmux"
-    echo "  - mdview-status should report its listener as RUNNING on IPv4 loopback"
+    echo "  - mdview <file.md> [port] uses @hypersoweak/mdprev@$MDPREV_VERSION"
+    echo "  - Open http://localhost:<port> in the Browser surface; do not publish the RunPod port"
     echo ""
     print_info "Test clipboard integration:"
     echo "  - In remote nvim, select text and press <C-c>"
