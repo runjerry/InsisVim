@@ -465,7 +465,7 @@ setup_fish_shell() {
     local fish_path
     local current_login_shell
     local user_name
-    local bashrc_marker="# cmux-phase-a: enter Fish from interactive Bash"
+    local bashrc_marker="# cmux-phase-a-v3: defer interactive Bash to Fish"
 
     fish_path="$(command -v fish)"
     user_name="$(id -un)"
@@ -498,10 +498,12 @@ setup_fish_shell() {
             print_info "Adding guarded interactive-Bash to Fish handoff..."
             cat >> "$HOME/.bashrc" << 'EOF'
 
-# cmux-phase-a: enter Fish from interactive Bash
+# cmux-phase-a-v3: defer interactive Bash to Fish
+# cmux's generated .bashrc loads this user file before exporting its CMUX_*
+# variables. Defer the handoff until the first prompt, after cmux has finished
+# installing its own PROMPT_COMMAND and environment.
 if [[ $- == *i* ]] && command -v fish >/dev/null 2>&1 && [ -z "${FISH_VERSION:-}" ]; then
-    _cmux_parent_shell="$(ps -p "$PPID" -o comm= 2>/dev/null | tr -d '[:space:]')"
-    if [ "$_cmux_parent_shell" != "fish" ]; then
+    _cmux_phase_a_enter_fish() {
         # cmux ssh generates a per-workspace Fish config that reports PWD,
         # shell activity, ports and TTY state. Launch Fish through it while
         # retaining the user's real Fish config directory.
@@ -512,10 +514,13 @@ if [[ $- == *i* ]] && command -v fish >/dev/null 2>&1 && [ -z "${FISH_VERSION:-}
                 export XDG_CONFIG_HOME="$CMUX_SHELL_INTEGRATION_DIR"
             fi
         fi
-        unset _cmux_parent_shell
         exec fish
-    fi
-    unset _cmux_parent_shell
+    }
+
+    case ";${PROMPT_COMMAND:-};" in
+        *';_cmux_phase_a_enter_fish;'*) ;;
+        *) PROMPT_COMMAND="${PROMPT_COMMAND:+$PROMPT_COMMAND;}_cmux_phase_a_enter_fish" ;;
+    esac
 fi
 EOF
             print_success "Interactive Bash sessions will hand off to Fish"
