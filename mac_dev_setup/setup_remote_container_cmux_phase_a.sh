@@ -913,6 +913,87 @@ setup_claude_settings() {
     fi
 }
 
+ensure_uv() {
+    if command_exists uv; then
+        print_success "uv already available: $(uv --version)"
+        return 0
+    fi
+
+    local installer
+    installer="$(mktemp)"
+
+    print_info "Installing uv from the official Astral installer..."
+    if ! curl -LsSf https://astral.sh/uv/install.sh -o "$installer" ||
+       ! UV_NO_MODIFY_PATH=1 UV_INSTALL_DIR="$HOME/.local/bin" sh "$installer"; then
+        rm -f "$installer"
+        print_error "uv installation failed"
+        return 1
+    fi
+    rm -f "$installer"
+
+    export PATH="$HOME/.local/bin:$PATH"
+    hash -r
+    if ! command_exists uv; then
+        print_error "uv was installed but is not available on PATH"
+        return 1
+    fi
+
+    print_success "uv installed: $(uv --version)"
+}
+
+ensure_local_bin_in_fish() {
+    if command_exists fish; then
+        if fish -c 'fish_add_path $HOME/.local/bin' 2>/dev/null; then
+            print_success "~/.local/bin is available in Fish"
+        else
+            print_warning "Could not persist ~/.local/bin in Fish PATH"
+        fi
+    fi
+}
+
+verify_magic_wormhole() {
+    local version
+
+    if ! command_exists wormhole; then
+        print_error "wormhole is not available on PATH"
+        return 1
+    fi
+    if ! version="$(wormhole --version 2>&1)"; then
+        print_error "wormhole exists but failed its version check"
+        return 1
+    fi
+
+    version="${version%%$'\n'*}"
+    print_success "Magic Wormhole available: $version"
+}
+
+install_magic_wormhole() {
+    if command_exists wormhole || [ -x "$HOME/.local/bin/wormhole" ]; then
+        export PATH="$HOME/.local/bin:$PATH"
+        ensure_local_bin_in_fish
+        verify_magic_wormhole
+        return
+    fi
+
+    if ! ask_yes_no "Install Magic Wormhole with uv tool?"; then
+        print_warning "Skipping Magic Wormhole"
+        return 0
+    fi
+
+    ensure_uv
+    ensure_local_bin_in_fish
+
+    print_info "Installing Magic Wormhole with uv tool..."
+    if ! uv tool install magic-wormhole; then
+        print_error "Magic Wormhole installation failed"
+        return 1
+    fi
+
+    export PATH="$HOME/.local/bin:$PATH"
+    hash -r
+    verify_magic_wormhole
+}
+
 install_additional_tools() {
     print_step "Step 9: Installing Additional LSPs/Formatters (Optional)"
 
@@ -929,6 +1010,9 @@ install_additional_tools() {
             print_warning "pip not found, skipping Python tools"
         fi
     fi
+
+    # Magic Wormhole (isolated CLI installation managed by uv)
+    install_magic_wormhole
 
     # Claude Code
     if ! command_exists claude; then
