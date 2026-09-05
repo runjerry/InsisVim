@@ -35,9 +35,9 @@ SSH to your remote Linux machine, then download the setup script:
 
 ```bash
 # Option 1: Download the script directly
-curl -O https://raw.githubusercontent.com/runjerry/InsisVim/remote-setup/mac_dev_setup/setup_remote_linux.sh
+curl -O https://raw.githubusercontent.com/runjerry/InsisVim/remote-setup/mac_dev_setup/setup_remote_container_cmux_phase_a.sh
 # or use wget
-wget https://raw.githubusercontent.com/runjerry/InsisVim/remote-setup/mac_dev_setup/setup_remote_linux.sh
+wget https://raw.githubusercontent.com/runjerry/InsisVim/remote-setup/mac_dev_setup/setup_remote_container_cmux_phase_a.sh
 
 # Option 2: Clone your nvim config repository (if it contains this script)
 git clone <your-nvim-config-repo> ~/.config/nvim
