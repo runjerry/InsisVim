@@ -913,6 +913,47 @@ setup_claude_settings() {
     fi
 }
 
+setup_codex_agents() {
+    local target="$HOME/.codex/AGENTS.md"
+
+    if [ -f "$target" ]; then
+        print_success "Codex instructions already exist, leaving unchanged"
+        return
+    fi
+
+    mkdir -p "$HOME/.codex"
+
+    if [ -f "$SETUP_SCRIPT_DIR/AGENTS.md" ]; then
+        print_info "Copying Codex instructions from local directory..."
+        install -m 600 "$SETUP_SCRIPT_DIR/AGENTS.md" "$target"
+    else
+        local repo_path="${NVIM_CONFIG_REPO#git@github.com:}"
+        repo_path="${repo_path%.git}"
+
+        local tmp_file
+        tmp_file="$(mktemp)"
+
+        print_info "Downloading Codex instructions from GitHub..."
+        if curl -fsSL \
+            "https://raw.githubusercontent.com/${repo_path}/${NVIM_CONFIG_BRANCH}/mac_dev_setup/AGENTS.md" \
+            -o "$tmp_file"; then
+            if ! install -m 600 "$tmp_file" "$target"; then
+                rm -f "$tmp_file"
+                print_error "Failed to install Codex instructions"
+                return 1
+            fi
+        else
+            print_warning "Failed to download Codex instructions"
+        fi
+
+        rm -f "$tmp_file"
+    fi
+
+    if [ -f "$target" ]; then
+        print_success "Codex instructions installed at $target"
+    fi
+}
+
 ensure_uv() {
     if command_exists uv; then
         print_success "uv already available: $(uv --version)"
@@ -1062,6 +1103,10 @@ install_additional_tools() {
         fi
     else
         print_success "Codex CLI already installed: $(codex --version 2>/dev/null || true)"
+    fi
+
+    if command_exists codex; then
+        setup_codex_agents
     fi
 
     # Add more tools as needed

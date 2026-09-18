@@ -46,25 +46,24 @@ git clone <your-nvim-config-repo> ~/.config/nvim
 ### 2. Run the Setup Script
 
 ```bash
-chmod +x setup_remote_linux.sh
-./setup_remote_linux.sh
+chmod +x setup_remote_container_cmux_phase_a.sh
+./setup_remote_container_cmux_phase_a.sh
 ```
 
 The script will:
+
 - Detect your Linux distribution and package manager
 - Install tmux (if not present)
 - Create `~/.tmux.conf` with OSC 52 passthrough configuration
-- Optionally install Fish shell and Neovim
+- Optionally install Fish shell, Neovim, Claude Code, and Codex CLI
+- Install `~/.claude/settings.json` from `claude_settings.json` when Claude Code is available
+- Install `~/.codex/AGENTS.md` with Markdown math formatting instructions when Codex CLI is available
 - Guide you through next steps
 
 ### 3. Install Tmux and Neovim Plugins
 
 - After starting tmux, press `ctrl+a` then `I` (shift+i) to intall all plugins.
 - First launch of nvim will automatically install all plugins.
-- Install claude-code
-  ```bash
-  curl -fsSL https://claude.ai/install.sh | bash
-  ```
 
 ### 4. Test the Setup
 
@@ -75,6 +74,16 @@ The script will:
 5. On your local macOS, press `Cmd+V` to paste
 
 ## What Gets Configured
+
+### Claude Code Settings (`~/.claude/settings.json`)
+
+After installing Claude Code, or detecting an existing installation, `setup_remote_container_cmux_phase_a.sh` copies this directory's `claude_settings.json` to `~/.claude/settings.json`. If only the setup script was downloaded, it fetches `claude_settings.json` from the configured GitHub repository and branch. The template does not overwrite an existing `settings.json`. If Claude Code is not installed, this template setup is skipped.
+
+The later cmux integration step adds missing `Stop` and `PostToolUse` (`Task`) notification hooks to `settings.json`, preserving other settings and creating a timestamped backup whenever it changes the file.
+
+### Codex Instructions (`~/.codex/AGENTS.md`)
+
+After installing Codex CLI, or detecting an existing installation, `setup_remote_container_cmux_phase_a.sh` copies this directory's `AGENTS.md` to `~/.codex/AGENTS.md`. If only the setup script was downloaded, it fetches `AGENTS.md` from the configured GitHub repository and branch. Existing `~/.codex/AGENTS.md` files are preserved. If Codex is not installed, this step is skipped.
 
 ### tmux Configuration (`~/.tmux.conf`)
 
@@ -174,6 +183,9 @@ Consider using a dotfiles repository to sync:
 
 ## Files in This Directory
 
+- `setup_remote_container_cmux_phase_a.sh` - RunPod/Docker setup script for the cmux Phase A workflow
+- `claude_settings.json` - Claude Code settings template, copied to `~/.claude/settings.json`
+- `AGENTS.md` - Codex Markdown math formatting instructions, copied to `~/.codex/AGENTS.md`
 - `setup_remote_linux.sh` - Main setup script for remote machines
 - `README.md` - This documentation
 - `mac_setup_guide.md` - Guide for local macOS setup (if applicable)
