@@ -53,7 +53,6 @@ if telescope and lga_actions and cfg and cfg.enable then
   keymap("n", cfg.keys.live_grep, ":<CMD>Telescope live_grep<CR>")
   keymap("n", cfg.keys.live_grep_args, ":lua require('telescope').extensions.live_grep_args.live_grep_args()<CR>")
 
-  pcall(telescope.load_extension, "env")
   -- To get ui-select loaded and working with telescope, you need to call
   -- load_extension, somewhere after setup function:
   pcall(telescope.load_extension, "ui-select")

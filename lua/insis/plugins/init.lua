@@ -35,7 +35,6 @@ return {
 
   -- telescope
   -- telescope extensions
-  { "LinArcX/telescope-env.nvim" },
   { "nvim-telescope/telescope-ui-select.nvim" },
   { "nvim-telescope/telescope-live-grep-args.nvim" },
   {
