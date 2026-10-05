@@ -58,6 +58,7 @@ The script will:
 - Optionally install Fish shell, Neovim, Claude Code, and Codex CLI
 - Install `~/.claude/settings.json` from `claude_settings.json` when Claude Code is available
 - Install `~/.codex/AGENTS.md` with Markdown math formatting instructions when Codex CLI is available
+- Create new `~/.codex/config.toml` files with cmux notifications and terminal scrollback enabled
 - Guide you through next steps
 
 ### 3. Install Tmux and Neovim Plugins
@@ -85,6 +86,19 @@ The later cmux integration step adds missing `Stop` and `PostToolUse` (`Task`) n
 
 After installing Codex CLI, or detecting an existing installation, `setup_remote_container_cmux_phase_a.sh` copies this directory's `AGENTS.md` to `~/.codex/AGENTS.md`. If only the setup script was downloaded, it fetches `AGENTS.md` from the configured GitHub repository and branch. Existing `~/.codex/AGENTS.md` files are preserved. If Codex is not installed, this step is skipped.
 
+### Codex Terminal Settings (`~/.codex/config.toml`)
+
+During cmux integration, `setup_remote_container_cmux_phase_a.sh` creates `~/.codex/config.toml` if it does not exist, with both the notification command and terminal scrollback enabled. For a root user, the initial file is:
+
+```toml
+notify = ["/root/.codex/cmux-notify.sh"]
+
+[tui]
+alternate_screen = "never"
+```
+
+This preserves terminal scrollback so `Ctrl+a` then `Esc` can browse Codex output in tmux copy mode. The scrollback default is only set when creating a new file. When the file already exists, setup keeps its TUI settings and only adds a missing top-level notification command.
+
 ### tmux Configuration (`~/.tmux.conf`)
 
 Key settings for OSC 52 clipboard integration:
@@ -98,6 +112,7 @@ Plus useful tmux settings:
 - Vim-like pane navigation (`h/j/k/l`)
 - Mouse support enabled
 - Vi mode for copy mode
+- `Ctrl+a` then `p` uses `paste-buffer -p` to preserve bracketed paste boundaries for multiline prompts
 
 ## How It Works
 

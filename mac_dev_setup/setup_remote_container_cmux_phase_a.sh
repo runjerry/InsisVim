@@ -1268,9 +1268,14 @@ EOF
     notify_line="notify = [\"$notify_script\"]"
 
     if [ ! -f "$config" ]; then
-        printf '%s\n' "$notify_line" > "$config"
+        cat > "$config" << EOF
+$notify_line
+
+[tui]
+alternate_screen = "never"
+EOF
         chmod 600 "$config"
-        print_success "Codex cmux notification configured"
+        print_success "Codex cmux notification and terminal scrollback configured"
         return 0
     fi
 
