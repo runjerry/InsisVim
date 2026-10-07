@@ -59,6 +59,7 @@ The script will:
 - Install `~/.claude/settings.json` from `claude_settings.json` when Claude Code is available
 - Install `~/.codex/AGENTS.md` with Markdown math formatting instructions when Codex CLI is available
 - Create new `~/.codex/config.toml` files with cmux notifications and terminal scrollback enabled
+- Configure Codex's `Ctrl+G` editor to open Neovim in paste mode for multiline prompts
 - Guide you through next steps
 
 ### 3. Install Tmux and Neovim Plugins
@@ -98,6 +99,20 @@ alternate_screen = "never"
 ```
 
 This preserves terminal scrollback so `Ctrl+a` then `Esc` can browse Codex output in tmux copy mode. The scrollback default is only set when creating a new file. When the file already exists, setup keeps its TUI settings and only adds a missing top-level notification command.
+
+### Codex Prompt Editor
+
+All three remote setup scripts install `~/.local/bin/codex-prompt-editor`, which runs `nvim -c 'set paste'`. The shared `fish_config.fish` defines a `codex` function when this helper is installed. The function sets `VISUAL` only for the Codex process and its children; the parent shell retains its normal editor setting. Direct `nvim` commands continue to use your usual Neovim configuration.
+
+For a long prompt, press `Ctrl+G` in Codex, enter Insert mode with `i`, paste and edit the text, then press `Esc` and save with `:wq`. Review the returned text in Codex before sending. There is no need to toggle `:set paste` and `:set nopaste` for each paste. Paste mode stays enabled in this editor process, so automatic indentation and Insert-mode mappings are disabled there.
+
+This is a workaround for terminals that do not deliver bracketed-paste markers reliably. If you invoke Codex from Bash, Zsh, or with `command codex`, the Fish function is bypassed. Use the helper explicitly in those cases:
+
+```sh
+env VISUAL="$HOME/.local/bin/codex-prompt-editor" codex
+```
+
+After updating an existing machine, open a new Fish shell and restart Codex with `codex resume --last` to use the editor setting. Keep the setup scripts and `fish_config.fish` in sync when copying them to another machine.
 
 ### tmux Configuration (`~/.tmux.conf`)
 
