@@ -47,6 +47,9 @@ end
 alias vim="nvim"
 alias vi="nvim"
 
+# Make the prompt editor and other user-installed commands available.
+fish_add_path "$HOME/.local/bin"
+
 # set nvim as default editor
 set -gx EDITOR nvim
 set -gx VISUAL nvim

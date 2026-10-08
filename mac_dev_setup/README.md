@@ -59,7 +59,7 @@ The script will:
 - Install `~/.claude/settings.json` from `claude_settings.json` when Claude Code is available
 - Install `~/.codex/AGENTS.md` with Markdown math formatting instructions when Codex CLI is available
 - Create new `~/.codex/config.toml` files with cmux notifications and terminal scrollback enabled
-- Configure Codex's `Ctrl+G` editor to open Neovim in paste mode for multiline prompts
+- Configure the `Ctrl+G` editor in Codex and Claude Code to open Neovim in paste mode for multiline prompts
 - Guide you through next steps
 
 ### 3. Install Tmux and Neovim Plugins
@@ -79,7 +79,9 @@ The script will:
 
 ### Claude Code Settings (`~/.claude/settings.json`)
 
-After installing Claude Code, or detecting an existing installation, `setup_remote_container_cmux_phase_a.sh` copies this directory's `claude_settings.json` to `~/.claude/settings.json`. If only the setup script was downloaded, it fetches `claude_settings.json` from the configured GitHub repository and branch. The template does not overwrite an existing `settings.json`. If Claude Code is not installed, this template setup is skipped.
+After installing Claude Code, or detecting an existing installation, `setup_remote_container.sh` and `setup_remote_container_cmux_phase_a.sh` copy this directory's `claude_settings.json` to `~/.claude/settings.json`. If only the setup script was downloaded, it fetches `claude_settings.json` from the configured GitHub repository and branch. The template does not overwrite an existing `settings.json`. If Claude Code is not installed, this template setup is skipped. `setup_remote_linux.sh` does not install the Claude settings template.
+
+The template sets both `env.EDITOR` and `env.VISUAL` to `codex-prompt-editor`, reusing the helper installed during Fish setup. The shared `fish_config.fish` adds `~/.local/bin` to `PATH`, so the command works for any username without a hard-coded home directory. Pressing `Ctrl+G` in Claude Code opens Neovim with `set paste` enabled to preserve multiline indentation. For an existing machine, merge these two environment settings into `~/.claude/settings.json`, ensure the helper is on `PATH`, and restart Claude Code.
 
 The later cmux integration step adds missing `Stop` and `PostToolUse` (`Task`) notification hooks to `settings.json`, preserving other settings and creating a timestamped backup whenever it changes the file.
 

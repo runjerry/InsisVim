@@ -1,4 +1,8 @@
 {
+  "env": {
+    "EDITOR": "codex-prompt-editor",
+    "VISUAL": "codex-prompt-editor"
+  },
   "tui": "default",
   "theme": "dark"
 }
