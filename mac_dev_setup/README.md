@@ -81,7 +81,9 @@ The script will:
 
 After installing Claude Code, or detecting an existing installation, `setup_remote_container.sh` and `setup_remote_container_cmux_phase_a.sh` copy this directory's `claude_settings.json` to `~/.claude/settings.json`. If only the setup script was downloaded, it fetches `claude_settings.json` from the configured GitHub repository and branch. The template does not overwrite an existing `settings.json`. If Claude Code is not installed, this template setup is skipped. `setup_remote_linux.sh` does not install the Claude settings template.
 
-The template sets both `env.EDITOR` and `env.VISUAL` to `codex-prompt-editor`, reusing the helper installed during Fish setup. The shared `fish_config.fish` adds `~/.local/bin` to `PATH`, so the command works for any username without a hard-coded home directory. Pressing `Ctrl+G` in Claude Code opens Neovim with `set paste` enabled to preserve multiline indentation. For an existing machine, merge these two environment settings into `~/.claude/settings.json`, ensure the helper is on `PATH`, and restart Claude Code.
+The template sets both `env.EDITOR` and `env.VISUAL` to `nvim-prompt-editor`, reusing the helper installed during Fish setup. The shared `fish_config.fish` adds `~/.local/bin` to `PATH`, so the command works for any username without a hard-coded home directory. Pressing `Ctrl+G` in Claude Code opens Neovim with `set paste` enabled to preserve multiline indentation. For an existing machine, merge these two environment settings into `~/.claude/settings.json`, ensure the helper is on `PATH`, and restart Claude Code.
+
+Keep `code` out of the helper's command name: Claude Code 2.1.292 identifies VS Code by that substring, so `codex-prompt-editor` is misclassified as a graphical editor and does not use the terminal editor handoff.
 
 The later cmux integration step adds missing `Stop` and `PostToolUse` (`Task`) notification hooks to `settings.json`, preserving other settings and creating a timestamped backup whenever it changes the file.
 
@@ -104,14 +106,14 @@ This preserves terminal scrollback so `Ctrl+a` then `Esc` can browse Codex outpu
 
 ### Codex Prompt Editor
 
-All three remote setup scripts install `~/.local/bin/codex-prompt-editor`, which runs `nvim -c 'set paste'`. The shared `fish_config.fish` defines a `codex` function when this helper is installed. The function sets `VISUAL` only for the Codex process and its children; the parent shell retains its normal editor setting. Direct `nvim` commands continue to use your usual Neovim configuration.
+All three remote setup scripts install `~/.local/bin/nvim-prompt-editor`, which runs `nvim -c 'set paste'`. The shared `fish_config.fish` defines a `codex` function when this helper is installed. The function sets `VISUAL` only for the Codex process and its children; the parent shell retains its normal editor setting. Direct `nvim` commands continue to use your usual Neovim configuration.
 
 For a long prompt, press `Ctrl+G` in Codex, enter Insert mode with `i`, paste and edit the text, then press `Esc` and save with `:wq`. Review the returned text in Codex before sending. There is no need to toggle `:set paste` and `:set nopaste` for each paste. Paste mode stays enabled in this editor process, so automatic indentation and Insert-mode mappings are disabled there.
 
 This is a workaround for terminals that do not deliver bracketed-paste markers reliably. If you invoke Codex from Bash, Zsh, or with `command codex`, the Fish function is bypassed. Use the helper explicitly in those cases:
 
 ```sh
-env VISUAL="$HOME/.local/bin/codex-prompt-editor" codex
+env VISUAL="$HOME/.local/bin/nvim-prompt-editor" codex
 ```
 
 After updating an existing machine, open a new Fish shell and restart Codex with `codex resume --last` to use the editor setting. Keep the setup scripts and `fish_config.fish` in sync when copying them to another machine.

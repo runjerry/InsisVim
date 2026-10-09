@@ -1,7 +1,7 @@
 {
   "env": {
-    "EDITOR": "codex-prompt-editor",
-    "VISUAL": "codex-prompt-editor"
+    "EDITOR": "nvim-prompt-editor",
+    "VISUAL": "nvim-prompt-editor"
   },
   "tui": "default",
   "theme": "dark"

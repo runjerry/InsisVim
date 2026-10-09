@@ -425,13 +425,13 @@ setup_fish_config_and_plugins() {
 
     # Preserve prompt text when terminal bracketed-paste markers are unavailable.
     mkdir -p "$HOME/.local/bin"
-    cat > "$HOME/.local/bin/codex-prompt-editor" << 'EOF'
+    cat > "$HOME/.local/bin/nvim-prompt-editor" << 'EOF'
 #!/bin/sh
 # Preserve pasted prompt text even when bracketed paste is unavailable.
 exec nvim -c 'set paste' "$@"
 EOF
-    chmod 755 "$HOME/.local/bin/codex-prompt-editor"
-    print_success "Codex prompt editor installed (Neovim paste mode)"
+    chmod 755 "$HOME/.local/bin/nvim-prompt-editor"
+    print_success "Neovim prompt editor installed (paste mode)"
 
     # Install Fisher (bootstrap) - this overwrites fish_plugins, so we download plugins list AFTER
     print_info "Installing Fisher (Fish plugin manager)..."

@@ -55,9 +55,9 @@ set -gx EDITOR nvim
 set -gx VISUAL nvim
 
 # The setup scripts install this editor for Codex's Ctrl+G prompt editing.
-if test -x "$HOME/.local/bin/codex-prompt-editor"
+if test -x "$HOME/.local/bin/nvim-prompt-editor"
     function codex --description 'Run Codex with Neovim paste mode for prompt editing'
-        set -lx VISUAL "$HOME/.local/bin/codex-prompt-editor"
+        set -lx VISUAL "$HOME/.local/bin/nvim-prompt-editor"
         command codex $argv
     end
 end
