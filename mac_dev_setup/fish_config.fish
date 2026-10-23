@@ -1,9 +1,6 @@
 if status is-interactive
     # Commands to run in interactive sessions can go here
 
-    # Add npm global bin to PATH (for cclsp and other global npm packages)
-    fish_add_path /root/.node_modules/bin
-
     # Use ripgrep for Ctrl+T to search files (faster than default find)
     set -gx FZF_CTRL_T_COMMAND 'rg --files --hidden --follow --glob "!.git" 2>/dev/null'
 
@@ -47,8 +44,17 @@ end
 alias vim="nvim"
 alias vi="nvim"
 
+# Debian/Ubuntu name the bat executable batcat; fzf.fish invokes bat.
+if not command -q bat; and command -q batcat
+    alias bat="batcat"
+end
+
 # Make the prompt editor and other user-installed commands available.
-fish_add_path "$HOME/.local/bin"
+fish_add_path "$HOME/.local/bin" "$HOME/.node_modules/bin" "$HOME/.fzf/bin"
+# Keep the CUDA toolkit available when switching from the image's Bash setup.
+if test -d /usr/local/cuda/bin
+    fish_add_path /usr/local/cuda/bin
+end
 
 # set nvim as default editor
 set -gx EDITOR nvim
@@ -62,76 +68,77 @@ if test -x "$HOME/.local/bin/nvim-prompt-editor"
     end
 end
 
-# Allow pip to install system-wide in containers
-set -gx PIP_BREAK_SYSTEM_PACKAGES 1
-
 # add anthropic api key
 
 # SSH Agent forwarding fix for tmux
 # When SSH_AUTH_SOCK is set (forwarded agent), create a stable symlink
 # so tmux sessions can find the agent after reconnecting
-if test -n "$SSH_AUTH_SOCK" -a "$SSH_AUTH_SOCK" != "$HOME/.ssh/agent_sock"
-    ln -sf "$SSH_AUTH_SOCK" "$HOME/.ssh/agent_sock"
-    set -gx SSH_AUTH_SOCK "$HOME/.ssh/agent_sock"
-end
-
-# Fix stale SSH agent socket (e.g., after tmux reattach)
-# If current socket doesn't work, find a working one
-function fix_ssh_agent --description "Find and use a working SSH agent socket"
-    # First check if current socket works
-    if ssh-add -l >/dev/null 2>&1
-        return 0
+if status is-interactive
+    mkdir -p "$HOME/.ssh"
+    if test -n "$SSH_AUTH_SOCK" -a "$SSH_AUTH_SOCK" != "$HOME/.ssh/agent_sock"
+        ln -sf "$SSH_AUTH_SOCK" "$HOME/.ssh/agent_sock"
+        set -gx SSH_AUTH_SOCK "$HOME/.ssh/agent_sock"
     end
 
-    # Current socket is stale, find a working one
-    for sock in /tmp/ssh-*/agent.*
-        if test -S "$sock"
-            if SSH_AUTH_SOCK=$sock ssh-add -l >/dev/null 2>&1
-                ln -sf "$sock" "$HOME/.ssh/agent_sock"
-                set -gx SSH_AUTH_SOCK "$HOME/.ssh/agent_sock"
-                return 0
+    # Fix stale SSH agent socket (e.g., after tmux reattach)
+    # If current socket doesn't work, find a working one
+    function fix_ssh_agent --description "Find and use a working SSH agent socket"
+        # First check if current socket works
+        if ssh-add -l >/dev/null 2>&1
+            return 0
+        end
+
+        # Current socket is stale, find a working one
+        for sock in /tmp/ssh-*/agent.*
+            if test -S "$sock"
+                if SSH_AUTH_SOCK=$sock ssh-add -l >/dev/null 2>&1
+                    ln -sf "$sock" "$HOME/.ssh/agent_sock"
+                    set -gx SSH_AUTH_SOCK "$HOME/.ssh/agent_sock"
+                    return 0
+                end
             end
         end
-    end
-    return 1
-end
-
-# Auto-fix on shell startup if socket seems stale
-if test -n "$SSH_AUTH_SOCK"
-    if not ssh-add -l >/dev/null 2>&1
-        fix_ssh_agent
-    end
-end
-
-# SSH Agent setup for Fish + Tmux
-# Only start agent if SSH_AUTH_SOCK is not already set (e.g., from agent forwarding)
-if test -z "$SSH_AUTH_SOCK"
-    set -gx SSH_ENV $HOME/.ssh/environment
-
-    function start_agent
-        echo "Starting SSH agent..."
-        ssh-agent -c | sed 's/^echo/#echo/' > $SSH_ENV
-        chmod 600 $SSH_ENV
-        source $SSH_ENV > /dev/null
-        ssh-add ~/.ssh/id_ed25519 2>/dev/null
+        return 1
     end
 
-    function test_identities
-        ssh-add -l > /dev/null 2>&1
-        return $status
+    # Auto-fix on shell startup if socket seems stale
+    if test -n "$SSH_AUTH_SOCK"
+        if not ssh-add -l >/dev/null 2>&1
+            fix_ssh_agent
+        end
     end
 
-    # Check if agent is running
-    if test -n "$SSH_AGENT_PID"
-        if not ps -p $SSH_AGENT_PID > /dev/null
+    # SSH Agent setup for Fish + Tmux
+    # Only start agent if SSH_AUTH_SOCK is not already set (e.g., from agent forwarding)
+    if test -z "$SSH_AUTH_SOCK"
+        set -gx SSH_ENV $HOME/.ssh/environment
+
+        function start_agent
+            echo "Starting SSH agent..."
+            ssh-agent -c | sed 's/^echo/#echo/' >$SSH_ENV
+            chmod 600 $SSH_ENV
+            source $SSH_ENV >/dev/null
+            ssh-add ~/.ssh/id_ed25519 2>/dev/null
+        end
+
+        function test_identities
+            ssh-add -l >/dev/null 2>&1
+            # Exit 1 means a live agent with no identities; only 2 means no agent.
+            test $status -ne 2
+        end
+
+        # Check if agent is running
+        if test -n "$SSH_AGENT_PID"
+            if not ps -p $SSH_AGENT_PID >/dev/null
+                start_agent
+            end
+        else if test -f $SSH_ENV
+            source $SSH_ENV >/dev/null
+            if not test_identities
+                start_agent
+            end
+        else
             start_agent
         end
-    else if test -f $SSH_ENV
-        source $SSH_ENV > /dev/null
-        if not test_identities
-            start_agent
-        end
-    else
-        start_agent
     end
-end
+end # interactive SSH agent setup

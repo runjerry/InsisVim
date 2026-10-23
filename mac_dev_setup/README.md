@@ -4,7 +4,7 @@ This directory contains setup scripts for configuring remote Linux machines.
 
 ## Scenario
 
-**Local:** macOS with Alacritty terminal
+**Local:** macOS with Alacritty, or cmux/Ghostty
 **Remote:** Linux machine accessed via SSH, running Fish shell, tmux, and Neovim
 
 **Goal:** Copy from remote Neovim with `<C-c>` and paste to local macOS clipboard with `Cmd+V`
@@ -29,7 +29,46 @@ The setup script will configure the remote machine automatically.
 
 ## Quick Start
 
-### 1. Get the Setup Script on Remote Machine
+### 1. Choose the Script for Your Remote Machine
+
+Use `remote-setup` for the validated RunPod/Docker workflow and `linux-server-setup` for native Linux servers. Each branch contains its own Fish and tmux templates. When provisioning a container from a checkout, use the `remote-setup` checkout: scripts prefer adjacent template files, so running a container script from the Linux server branch would also use that branch's templates.
+
+For a **native Linux server or VM** (tested on Ubuntu 24.04 x86_64), run as the account you want to configure:
+
+```bash
+curl -fLO https://raw.githubusercontent.com/runjerry/InsisVim/linux-server-setup/mac_dev_setup/setup_remote_linux.sh
+bash setup_remote_linux.sh
+# Unattended installation of all optional tools:
+bash setup_remote_linux.sh -y
+```
+
+To review the native script and templates before running:
+
+```bash
+git clone --branch linux-server-setup --single-branch https://github.com/runjerry/InsisVim.git
+bash InsisVim/mac_dev_setup/setup_remote_linux.sh -y
+```
+
+Root is supported directly. For a regular user, run without `sudo`; the script uses `sudo` only for package installation and account shell changes. Running the whole script with `sudo` would configure the wrong home directory and is rejected.
+
+The native script includes the tools and cmux workflow from the Phase A container script, with these host-specific behaviors:
+
+| Area | Native Linux behavior |
+| --- | --- |
+| Fish | Uses `chsh`; only cmux-injected Bash sessions hand off to Fish after cmux initialization |
+| Python | Installs `python-lsp-server`, Black and Magic Wormhole using isolated `uv tool` environments; keeps system Python protection enabled |
+| Existing configuration | Preserves Neovim data, installed Neovim, Git identity, Claude/Codex credentials, providers and explicit editor/notification/TUI preferences in `-y` mode |
+| Backups | Saves original files before changes under `~/.local/state/insis-setup/backups/<timestamp>-<pid>/` |
+| Plugins | Installs Fisher, TPM plugins, enabled Neovim plugins, language tools and syntax parsers automatically |
+| Remote workflow | Includes cmux notifications, Fish working-directory reporting, paste-mode prompt editing and `mdview` helpers |
+
+Fish and tmux configuration templates are refreshed with backups. The Neovim configuration is cloned over HTTPS only when absent. The native script fetches templates and new Neovim checkouts from `linux-server-setup` by default. `NVIM_CONFIG_REPO` and `NVIM_CONFIG_BRANCH` can override the default GitHub repository/branch, and `INSIS_GIT_NAME` / `INSIS_GIT_EMAIL` override the default identity when none exists. Re-running `-y` retries installation without deleting Neovim directories or forcing a Neovim reinstall.
+
+Neovim remains pinned to **v0.9.5**, matching the repository's existing plugin lockfile; its x86_64 archive and the optional tmux 3.4 source build are SHA-256 checked. Other architectures fail explicitly instead of installing an incompatible binary. Existing Codex TOML is validated before merging; this requires Python 3.11+ (included with Ubuntu 24.04).
+
+The native `mdview <file.md> [port]` helper restricts previews to `127.0.0.1`. Use cmux port forwarding, or `ssh -L 5173:127.0.0.1:5173 <host>` for ordinary SSH, then open `http://localhost:5173` on your Mac. Use `mdview-status` and `mdview-stop [port]` to manage previews. The pinned `mdprev` package has no host option, so the native helper uses a Node preload scoped to the preview process to enforce the bind address. Existing custom helper files are preserved.
+
+For a **RunPod/Docker container**, use the Phase A script:
 
 SSH to your remote Linux machine, then download the setup script:
 
@@ -39,11 +78,12 @@ curl -O https://raw.githubusercontent.com/runjerry/InsisVim/remote-setup/mac_dev
 # or use wget
 wget https://raw.githubusercontent.com/runjerry/InsisVim/remote-setup/mac_dev_setup/setup_remote_container_cmux_phase_a.sh
 
-# Option 2: Clone your nvim config repository (if it contains this script)
-git clone <your-nvim-config-repo> ~/.config/nvim
+# Alternatively, clone the validated container branch:
+git clone --branch remote-setup --single-branch https://github.com/runjerry/InsisVim.git
+# Then run InsisVim/mac_dev_setup/setup_remote_container_cmux_phase_a.sh.
 ```
 
-### 2. Run the Setup Script
+### 2. Run the Container Setup Script
 
 ```bash
 chmod +x setup_remote_container_cmux_phase_a.sh
@@ -64,8 +104,9 @@ The script will:
 
 ### 3. Install Tmux and Neovim Plugins
 
-- After starting tmux, press `ctrl+a` then `I` (shift+i) to intall all plugins.
-- First launch of nvim will automatically install all plugins.
+- The native script installs tmux and Neovim plugins during setup.
+- For the container scripts, install tmux plugins with `Ctrl+a` then `I` (Shift+i).
+- The Phase A script also bootstraps Neovim plugins; other setups install them on first launch.
 
 ### 4. Test the Setup
 
@@ -79,7 +120,7 @@ The script will:
 
 ### Claude Code Settings (`~/.claude/settings.json`)
 
-After installing Claude Code, or detecting an existing installation, `setup_remote_container.sh` and `setup_remote_container_cmux_phase_a.sh` copy this directory's `claude_settings.json` to `~/.claude/settings.json`. If only the setup script was downloaded, it fetches `claude_settings.json` from the configured GitHub repository and branch. The template does not overwrite an existing `settings.json`. If Claude Code is not installed, this template setup is skipped. `setup_remote_linux.sh` does not install the Claude settings template.
+All three setup scripts install this directory's `claude_settings.json` when Claude Code is available and the settings file is absent. Standalone downloads fetch templates from the configured GitHub repository and branch. Existing settings are preserved. The native script also adds missing `env.EDITOR` and `env.VISUAL` entries with a backup, without replacing credentials, provider settings or existing editor preferences.
 
 The template sets both `env.EDITOR` and `env.VISUAL` to `nvim-prompt-editor`, reusing the helper installed during Fish setup. The shared `fish_config.fish` adds `~/.local/bin` to `PATH`, so the command works for any username without a hard-coded home directory. Pressing `Ctrl+G` in Claude Code opens Neovim with `set paste` enabled to preserve multiline indentation. For an existing machine, merge these two environment settings into `~/.claude/settings.json`, ensure the helper is on `PATH`, and restart Claude Code.
 
@@ -89,7 +130,7 @@ The later cmux integration step adds missing `Stop` and `PostToolUse` (`Task`) n
 
 ### Codex Instructions (`~/.codex/AGENTS.md`)
 
-After installing Codex CLI, or detecting an existing installation, `setup_remote_container_cmux_phase_a.sh` copies this directory's `AGENTS.md` to `~/.codex/AGENTS.md`. If only the setup script was downloaded, it fetches `AGENTS.md` from the configured GitHub repository and branch. Existing `~/.codex/AGENTS.md` files are preserved. If Codex is not installed, this step is skipped.
+After installing Codex CLI, or detecting an existing installation, the native and Phase A scripts copy this directory's `AGENTS.md` to `~/.codex/AGENTS.md`. Standalone downloads fetch it from the configured repository and branch. Existing instruction files are preserved. If Codex is not installed, this step is skipped.
 
 ### Codex Terminal Settings (`~/.codex/config.toml`)
 
@@ -102,7 +143,7 @@ notify = ["/root/.codex/cmux-notify.sh"]
 alternate_screen = "never"
 ```
 
-This preserves terminal scrollback so `Ctrl+a` then `Esc` can browse Codex output in tmux copy mode. The scrollback default is only set when creating a new file. When the file already exists, setup keeps its TUI settings and only adds a missing top-level notification command.
+This preserves terminal scrollback so `Ctrl+a` then `Esc` can browse Codex output in tmux copy mode. The Phase A container script only sets this scrollback default for new files. The native script also adds it to an existing `[tui]` table when the option is absent, preserving explicit values and other TUI settings. Both scripts preserve an existing top-level notification command.
 
 ### Codex Prompt Editor
 
@@ -224,6 +265,16 @@ Consider using a dotfiles repository to sync:
 - `README.md` - This documentation
 - `mac_setup_guide.md` - Guide for local macOS setup (if applicable)
 
+## Native Script Checks
+
+```bash
+bash -n mac_dev_setup/setup_remote_linux.sh
+shellcheck -S warning mac_dev_setup/setup_remote_linux.sh
+python3 -m unittest discover -s mac_dev_setup/tests -v
+```
+
+Run these from the repository root. The regression tests use temporary home directories and do not install packages or change login shells. They cover existing credentials/preferences, backups, repeated configuration merges, failed downloads, standalone GitHub URLs, preservation of Neovim data, prompt editing, and the preview bind address. Bash, jq and Python 3.11+ are required; the preview test also requires Node.js and Fish.
+
 ## Support
 
 If you encounter issues, check:
@@ -233,4 +284,4 @@ If you encounter issues, check:
 
 ---
 
-**Last Updated:** 2025-11-23
+**Last Updated:** 2026-10-23
