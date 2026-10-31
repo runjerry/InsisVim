@@ -134,6 +134,82 @@ class NativeSetupTests(unittest.TestCase):
     def test_eof_declines_instead_of_looping(self):
         self.run_setup('if ask_yes_no "Proceed?" </dev/null; then exit 1; fi')
 
+    def run_language_bootstrap(self, complete_python=True, complete_lua=True):
+        # Neovim processes init.lua before the setup script's +luafile command.
+        # Model an in-flight startup install: a second request for the same
+        # parser must fail, rather than silently masking the original race.
+        bootstrap = SCRIPT.read_text().split("install_neovim_language_tools() {", 1)[1]
+        bootstrap = bootstrap.split("cat > \"$bootstrap\" <<'LUA'\n", 1)[1].split("\nLUA", 1)[0]
+        bootstrap_path = self.write("language-bootstrap.lua", bootstrap)
+        fixture = r'''
+local installed, requested = {}, {}
+local parser_dir = vim.fn.stdpath("data") .. "/test-parsers"
+vim.fn.mkdir(parser_dir, "p")
+local installer = {
+    ensure_installed = function(languages)
+        for _, language in ipairs(languages) do
+            assert(not requested[language], "duplicate parser installation: " .. language)
+            requested[language] = true
+        end
+        vim.defer_fn(function()
+            installed.lua = COMPLETE_LUA
+            installed.python = COMPLETE_PYTHON
+            for language, ready in pairs(installed) do
+                if ready then vim.fn.writefile({}, parser_dir .. "/" .. language .. ".so") end
+            end
+            print("startup parser installation finished")
+        end, 20)
+    end,
+}
+package.preload["insis.env"] = function()
+    return {
+        getTSEnsureList = function() return { "lua", "python" } end,
+        getLSPEnsureList = function() return {} end,
+        getToolEnsureList = function() return {} end,
+    }
+end
+package.preload["mason-registry"] = function() return { refresh = function() end } end
+package.preload["mason-lspconfig.mappings.server"] = function()
+    return { lspconfig_to_package = {} }
+end
+package.preload["nvim-treesitter.install"] = function() return installer end
+package.preload["nvim-treesitter.configs"] = function()
+    return { get_parser_install_dir = function() return parser_dir end }
+end
+package.preload["nvim-treesitter.parsers"] = function()
+    -- Neovim bundles Lua, so it is available before the plugin finishes installing.
+    return { has_parser = function(language) return language == "lua" or installed[language] == true end }
+end
+local wait = vim.wait
+vim.wait = function(_, predicate) return wait(250, predicate, 10) end
+installer.ensure_installed({ "lua", "python" })
+'''.replace("COMPLETE_PYTHON", "true" if complete_python else "false").replace(
+            "COMPLETE_LUA", "true" if complete_lua else "false")
+        fixture_path = self.write("language-startup.lua", fixture)
+        return subprocess.run(
+            ["nvim", "--headless", "--noplugin", "-i", "NONE", "-u", str(fixture_path),
+             "+luafile " + str(bootstrap_path), "+qa"],
+            env=self.env, text=True, capture_output=True, timeout=10,
+        )
+
+    @unittest.skipUnless(shutil.which("nvim"), "requires Neovim")
+    def test_language_bootstrap_waits_for_startup_without_duplicate_parser_jobs(self):
+        result = self.run_language_bootstrap()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn("startup parser installation finished", result.stdout + result.stderr)
+
+    @unittest.skipUnless(shutil.which("nvim"), "requires Neovim")
+    def test_language_bootstrap_reports_a_missing_parser(self):
+        result = self.run_language_bootstrap(complete_python=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Language tools not installed: parser:python", result.stdout + result.stderr)
+
+    @unittest.skipUnless(shutil.which("nvim"), "requires Neovim")
+    def test_language_bootstrap_bundled_lua_does_not_mask_unfinished_install(self):
+        result = self.run_language_bootstrap(complete_lua=False)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("Language tools not installed: parser:lua", result.stdout + result.stderr)
+
     @unittest.skipUnless(shutil.which("node") and shutil.which("fish"), "requires Node and Fish")
     def test_native_preview_guard_binds_to_loopback(self):
         self.run_setup("npx() { return 0; }; setup_mdview_helpers")

@@ -855,7 +855,10 @@ local ok, err = pcall(function()
         if not package:is_installed() then handles[#handles + 1] = package:install() end
     end
     local languages = env.getTSEnsureList()
-    require("nvim-treesitter.install").ensure_installed(languages)
+    -- InsisVim's treesitter.setup() already queued these installs during init.
+    -- Starting them again races over the same clone directories and Git locks.
+    -- Await the startup jobs below instead of creating a second installer.
+    local parser_dir = assert(require("nvim-treesitter.configs").get_parser_install_dir())
     local missing = {}
     local ready = vim.wait(300000, function()
         missing = {}
@@ -867,7 +870,10 @@ local ok, err = pcall(function()
             end
         end
         for _, language in ipairs(languages) do
-            if not require("nvim-treesitter.parsers").has_parser(language) then
+            -- Neovim's bundled parsers can satisfy has_parser() before the
+            -- plugin's own download/compile finishes (notably for Lua).
+            if not vim.loop.fs_stat(parser_dir .. "/" .. language .. ".so")
+                or not require("nvim-treesitter.parsers").has_parser(language) then
                 missing[#missing + 1] = "parser:" .. language
             end
         end
@@ -883,8 +889,8 @@ if not ok then
     vim.cmd("cquit 1")
 end
 LUA
-    # Startup commands run before VimEnter, so explicitly install and await the
-    # configured tools instead of exiting while Mason/Tree-sitter still work.
+    # Commands run before VimEnter: start Mason's installers explicitly, but
+    # only await Tree-sitter's jobs, which were already queued during init.
     if ! timeout --kill-after=5s 360s nvim --headless "+luafile $bootstrap" +qa; then
         rm -f "$bootstrap"
         print_error "Neovim language tool installation failed; see :MasonLog"
