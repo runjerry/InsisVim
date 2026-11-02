@@ -929,6 +929,52 @@ setup_claude_settings() {
     print_success "Claude prompt editor configured (existing settings preserved)"
 }
 
+setup_codex_config() {
+    local config="$HOME/.codex/config.toml"
+    local notify_script="${1:-}" tmp_file
+
+    mkdir -p "$(dirname "$config")"
+    # Configure terminal scrollback as soon as Codex is available. It must not
+    # depend on later Neovim installs, cmux integration, or jq availability.
+    # A notifier may be supplied separately by the cmux integration step.
+    tmp_file="$(mktemp)"
+    if ! python3 - "$config" "$notify_script" "$tmp_file" <<'PYCODE'
+import json
+import re
+import sys
+import tomllib
+from pathlib import Path
+
+config = Path(sys.argv[1])
+notifier = sys.argv[2]
+output = Path(sys.argv[3])
+text = config.read_text() if config.exists() else ""
+data = tomllib.loads(text)
+if notifier and "notify" not in data:
+    text = "notify = " + json.dumps([notifier]) + "\n\n" + text
+if "alternate_screen" not in data.get("tui", {}):
+    section = re.search(r'^\s*\[\s*(?:tui|"tui"|\'tui\')\s*\][ \t]*(?:#[^\n]*)?$', text, re.M)
+    if section:
+        text = text[:section.end()] + '\nalternate_screen = "never"' + text[section.end():]
+    elif "tui" not in data:
+        text = text.rstrip() + '\n\n[tui]\nalternate_screen = "never"\n'
+    # Unusual inline/dotted TUI tables are deliberately left intact.
+tomllib.loads(text)
+output.write_text(text)
+PYCODE
+    then
+        rm -f "$tmp_file"
+        print_error "Cannot parse/merge Codex TOML (Python 3.11+ required); existing file preserved"
+        return 1
+    fi
+    if ! cmp -s "$tmp_file" "$config"; then
+        backup_file "$config"
+        install -m 600 "$tmp_file" "$config"
+    fi
+    rm -f "$tmp_file"
+    print_success "Codex terminal settings configured (existing values preserved)"
+}
+
 setup_codex_agents() {
     local target="$HOME/.codex/AGENTS.md"
     if [ -f "$target" ]; then
@@ -1084,6 +1130,7 @@ install_additional_tools() {
     fi
 
     if command_exists codex; then
+        setup_codex_config
         setup_codex_agents
     fi
 
@@ -1191,10 +1238,9 @@ EOF
 
 setup_cmux_codex_notifications() {
     local codex_dir="$HOME/.codex"
-    local config="$codex_dir/config.toml"
     local notify_script="$codex_dir/cmux-notify.sh"
-    local notify_line
-    local tmp_file
+
+    setup_codex_config
 
     if ! command_exists jq; then
         print_warning "jq is required for Codex cmux notifications; skipping"
@@ -1242,55 +1288,7 @@ EOF
         fi
     fi
 
-    notify_line="notify = [\"$notify_script\"]"
-
-    if [ ! -f "$config" ]; then
-        cat > "$config" << EOF
-$notify_line
-
-[tui]
-alternate_screen = "never"
-EOF
-        chmod 600 "$config"
-        print_success "Codex cmux notification and terminal scrollback configured"
-        return 0
-    fi
-
-    # Parse before merging. Only add absent values and preserve the original
-    # text, including comments, credentials, custom providers and TUI settings.
-    tmp_file="$(mktemp)"
-    if ! python3 - "$config" "$notify_script" "$tmp_file" <<'PYCODE'
-import json
-import re
-import sys
-import tomllib
-from pathlib import Path
-
-config, notifier, output = map(Path, sys.argv[1:])
-text = config.read_text()
-data = tomllib.loads(text)
-if "notify" not in data:
-    text = "notify = " + json.dumps([str(notifier)]) + "\n\n" + text
-if "alternate_screen" not in data.get("tui", {}):
-    section = re.search(r'^\s*\[\s*(?:tui|"tui"|\'tui\')\s*\][ \t]*(?:#[^\n]*)?$', text, re.M)
-    if section:
-        text = text[:section.end()] + '\nalternate_screen = "never"' + text[section.end():]
-    elif "tui" not in data:
-        text = text.rstrip() + '\n\n[tui]\nalternate_screen = "never"\n'
-    # Unusual inline/dotted TUI tables are deliberately left intact.
-tomllib.loads(text)
-output.write_text(text)
-PYCODE
-    then
-        rm -f "$tmp_file"
-        print_error "Cannot parse/merge Codex TOML (Python 3.11+ required); existing file preserved"
-        return 1
-    fi
-    if ! cmp -s "$tmp_file" "$config"; then
-        backup_file "$config"
-        install -m 600 "$tmp_file" "$config"
-    fi
-    rm -f "$tmp_file"
+    setup_codex_config "$notify_script"
     print_success "Codex notifications and scrollback configured (existing values preserved)"
 }
 

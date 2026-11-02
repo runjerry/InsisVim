@@ -143,7 +143,9 @@ notify = ["/root/.codex/cmux-notify.sh"]
 alternate_screen = "never"
 ```
 
-This preserves terminal scrollback so `Ctrl+a` then `Esc` can browse Codex output in tmux copy mode. The Phase A container script only sets this scrollback default for new files. The native script also adds it to an existing `[tui]` table when the option is absent, preserving explicit values and other TUI settings. Both scripts preserve an existing top-level notification command.
+This preserves terminal scrollback so `Ctrl+a` then `Esc` can browse Codex output in tmux copy mode. The Phase A container script only sets this scrollback default for new files. The native script sets it immediately after installing or detecting Codex, before installing Neovim plugins and language tools. It also adds it to an existing `[tui]` table when the option is absent, preserving explicit values and other TUI settings. This terminal setting does not require cmux or `jq`; the later cmux step adds notifications separately. Both scripts preserve an existing top-level notification command.
+
+To apply only the terminal setting on an existing Linux server, run `bash -c 'source "$1"; setup_codex_config' _ /path/to/setup_remote_linux.sh`. Restart Codex afterward; `codex resume --no-alt-screen` also lets you select and resume a conversation with terminal scrollback enabled. A running Codex process keeps its current terminal mode until restarted.
 
 ### Codex Prompt Editor
 

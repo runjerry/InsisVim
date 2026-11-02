@@ -82,6 +82,33 @@ class NativeSetupTests(unittest.TestCase):
         self.run_setup("setup_cmux_codex_notifications")
         self.assertEqual(target.read_text(), original)
 
+    def test_codex_scrollback_survives_later_neovim_install_failure(self):
+        result = self.run_setup(r'''
+for step in check_root detect_package_manager install_base_if_needed install_core_tools \
+            setup_fish_shell setup_fish_config_and_plugins setup_prompt_editor \
+            setup_tmux install_tmux_plugins install_neovim setup_neovim_config \
+            install_magic_wormhole; do
+    eval "$step() { :; }"
+done
+ask_yes_no() { [ "$1" = "Continue with setup?" ]; }
+command_exists() { [ "$1" = codex ]; }
+codex() { echo 'codex-cli test'; }
+install_neovim_plugins() { return 37; }
+main
+''', check=False)
+        self.assertEqual(result.returncode, 37, result.stdout + result.stderr)
+        result = tomllib.loads((self.home / ".codex/config.toml").read_text())
+        self.assertEqual(result["tui"]["alternate_screen"], "never")
+        self.assertNotIn("notify", result)
+        self.assertFalse((self.home / ".codex/cmux-notify.sh").exists())
+
+    def test_codex_scrollback_does_not_require_jq(self):
+        self.run_setup("command_exists() { return 1; }; setup_cmux_codex_notifications")
+        result = tomllib.loads((self.home / ".codex/config.toml").read_text())
+        self.assertEqual(result["tui"]["alternate_screen"], "never")
+        self.assertNotIn("notify", result)
+        self.assertFalse((self.home / ".codex/cmux-notify.sh").exists())
+
     def test_invalid_toml_is_not_replaced(self):
         target = self.write(".codex/config.toml", "[broken\n")
         result = self.run_setup("setup_cmux_codex_notifications", check=False)
