@@ -68,6 +68,18 @@ Neovim remains pinned to **v0.9.5**, matching the repository's existing plugin l
 
 The native `mdview <file.md> [port]` helper restricts previews to `127.0.0.1`. Use cmux port forwarding, or `ssh -L 5173:127.0.0.1:5173 <host>` for ordinary SSH, then open `http://localhost:5173` on your Mac. Use `mdview-status` and `mdview-stop [port]` to manage previews. The pinned `mdprev` package has no host option, so the native helper uses a Node preload scoped to the preview process to enforce the bind address. Existing custom helper files are preserved.
 
+Both scripts install `mdview`, `mdview-status` and `mdview-stop` as Fish functions. Each supports `-h` / `--help`. The optional second argument to `mdview` selects the port (default: `5173`); each preview needs an unused port.
+
+```fish
+mdview --help
+mdview README.md                 # Default port 5173
+mdview "notes with spaces.md" 8080 # Custom port 8080
+mdview-status                    # List previews and their ports
+mdview-stop 8080                 # Stop the preview on port 8080
+```
+
+When forwarding a custom port over SSH, use that port in the tunnel and browser URL too, for example `ssh -L 8080:127.0.0.1:8080 <host>` and `http://localhost:8080`. From Bash, invoke the function through Fish: `fish -c 'mdview README.md 8080'`.
+
 For a **RunPod/Docker container**, use the Phase A script:
 
 SSH to your remote Linux machine, then download the setup script:

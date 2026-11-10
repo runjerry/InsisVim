@@ -1383,8 +1383,37 @@ function __mdview_cleanup_launcher --argument-names launcher_pid
 end
 
 function mdview --description "Start Markdown + TeX preview in background"
-    if test (count $argv) -lt 1; or test (count $argv) -gt 2
+    if test (count $argv) -eq 0; or contains -- -h $argv; or contains -- --help $argv
+        printf '%s\n' \
+            'Usage: mdview <markdown-file> [port]' \
+            '       mdview -h | --help' \
+            '' \
+            'Start a Markdown + TeX preview in the background.' \
+            '' \
+            'Arguments:' \
+            '  markdown-file  File to preview; quote paths containing spaces.' \
+            '  port           Port number (default: 5173; range: 1-65535).' \
+            '                 Use a different, unused port for each preview.' \
+            '' \
+            'Examples:' \
+            '  mdview README.md                  # Default port 5173' \
+            '  mdview "notes with spaces.md" 8080 # Custom port 8080' \
+            '  mdview-status                     # List previews' \
+            '  mdview-stop 8080                  # Stop the preview on port 8080' \
+            '' \
+            'Remote access:' \
+            '  Forward the selected port with cmux, or run locally:' \
+            '    ssh -L 8080:127.0.0.1:8080 <host>' \
+            '  Then open http://localhost:8080 in your local browser.'
+        if test (count $argv) -eq 0
+            return 2
+        end
+        return 0
+    end
+
+    if test (count $argv) -gt 2
         echo "Usage: mdview <markdown-file> [port]"
+        echo "Run 'mdview --help' for examples."
         return 2
     end
 
@@ -1476,6 +1505,21 @@ function __mdview_status_pid_is_expected --argument-names pid
 end
 
 function mdview-status --description "List managed Markdown preview servers"
+    if contains -- -h $argv; or contains -- --help $argv
+        printf '%s\n' \
+            'Usage: mdview-status' \
+            '       mdview-status -h | --help' \
+            '' \
+            'List the port, PID and status of previews started by mdview.' \
+            'Use mdview-stop [port] to stop a preview (default port: 5173).'
+        return 0
+    end
+    if test (count $argv) -gt 0
+        echo "Usage: mdview-status"
+        echo "Run 'mdview-status --help' for details."
+        return 2
+    end
+
     set -l state_dir "$HOME/.cache/mdview"
     set -l found 0
 
@@ -1530,8 +1574,25 @@ function __mdview_stop_pid_is_expected --argument-names pid
 end
 
 function mdview-stop --description "Stop a managed Markdown preview"
+    if contains -- -h $argv; or contains -- --help $argv
+        printf '%s\n' \
+            'Usage: mdview-stop [port]' \
+            '       mdview-stop -h | --help' \
+            '' \
+            'Stop a preview started by mdview.' \
+            'Port defaults to 5173; valid ports are 1-65535.' \
+            '' \
+            'Examples:' \
+            '  mdview-stop       # Stop the preview on port 5173' \
+            '  mdview-stop 8080  # Stop the preview on port 8080' \
+            '' \
+            'Use mdview-status to list previews and their ports.'
+        return 0
+    end
+
     if test (count $argv) -gt 1
         echo "Usage: mdview-stop [port]"
+        echo "Run 'mdview-stop --help' for examples."
         return 2
     end
 
